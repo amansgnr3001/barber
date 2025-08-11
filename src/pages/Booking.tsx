@@ -22,6 +22,7 @@ export default function Booking() {
   // Track selected day as a string matching backend expectations: 'Anyday' | 'Monday' | ... | 'Friday'
   const [selectedDay, setSelectedDay] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
+  // Reverted: no specific start time required; backend proposes a time
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const { toast } = useToast();
@@ -77,6 +78,7 @@ export default function Booking() {
 
   const handleTimeChange = (value: string) => {
     setSelectedTime(value);
+    // no-op
   };
 
   const handleServiceChange = (dropdownId: string, serviceId: string) => {
@@ -115,6 +117,7 @@ export default function Booking() {
 
   const [bookingResponse, setBookingResponse] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +129,8 @@ export default function Booking() {
       });
       return;
     }
+
+    setIsBooking(true);
 
     // Prepare booking data
     const bookingData = {
@@ -143,19 +148,30 @@ export default function Booking() {
         toast({ title: 'Not logged in', description: 'Please log in to book an appointment.', variant: 'destructive' });
         return;
       }
+
+      toast({
+        title: "🔍 Searching for availability...",
+        description: "Please wait while we find the best slot for you.",
+      });
+
       const response = await fetch('http://localhost:3001/api/book-appointment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(bookingData),
       });
       const data = await response.json();
-      if (response.ok) {
+
+      if (data && data.success) {
         setBookingResponse(data);
         setShowModal(true);
+        toast({
+          title: "🎉 Slot Found!",
+          description: "We found an available slot for you. Please review the details.",
+        });
         // Reset form
         setCustomerName('');
         setCustomerPhone('');
-         setSelectedGender('gender');
+        setSelectedGender('gender');
         setSelectedDay('');
         setSelectedTime('');
         setSelectedServices([]);
@@ -163,17 +179,19 @@ export default function Booking() {
         setServices([]);
       } else {
         toast({
-          title: "Booking Failed",
-          description: data.error || data.message || 'Could not book appointment.',
+          title: "😔 No Availability",
+          description: (data && (data.message || data.error)) || 'No suitable slot available. Please try different preferences.',
           variant: "destructive",
         });
       }
     } catch (error: any) {
       toast({
-        title: "Booking Failed",
-        description: error.message || 'Could not book appointment.',
+        title: "❌ Booking Failed",
+        description: error.message || 'Could not book appointment. Please try again.',
         variant: "destructive",
       });
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -196,10 +214,13 @@ export default function Booking() {
   ];
 
   const timeOptions = [
-    { value: 'morning', label: '9:00 AM - 10:00 AM' },
-    { value: 'afternoon', label: '12:00 PM - 1:00 PM' },
-    { value: 'evening', label: '2:30 PM - 3:30 PM' }
+    { value: 'anytime', label: 'Any time' },
+    { value: 'morning', label: '9:00 AM - 12:00 PM' },
+    { value: 'afternoon', label: '12:00 PM - 1:30 PM' },
+    { value: 'evening', label: '2:30 PM - 6:00 PM' }
   ];
+
+  // removed getTimeBounds (no longer used)
 
   return (
     <div className="min-h-screen bg-background">
@@ -219,32 +240,111 @@ export default function Booking() {
             </p>
           </div>
 
-          {/* Booking Response Modal */}
+                {/* Booking Response Modal */}
           {showModal && bookingResponse && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
-                <h2 className="text-2xl font-bold mb-4">Booking Details</h2>
-                <p className="mb-2"><strong>Message:</strong> {bookingResponse.message}</p>
-                {bookingResponse.appointmentTime && (
-                  <p className="mb-2"><strong>Appointment Time:</strong> {new Date(bookingResponse.appointmentTime).toLocaleString()}</p>
-                )}
-                {bookingResponse.day && (
-                  <p className="mb-2"><strong>Day:</strong> {bookingResponse.day}</p>
-                )}
-                {bookingResponse.slot && (
-                  <p className="mb-2"><strong>Slot:</strong> {bookingResponse.slot}</p>
-                )}
-                {bookingResponse.links && (
-                  <div className="mb-2">
-                    <strong>Links:</strong>
-                    <div className="flex flex-col gap-2 mt-1">
-                      <a href={bookingResponse.links.accept} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Accept Booking</a>
-                      <a href={bookingResponse.links.decline} className="text-red-600 underline" target="_blank" rel="noopener noreferrer">Decline Booking</a>
-                    </div>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>🎯 Booking Response</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowModal(false)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">{bookingResponse.message}</p>
                   </div>
-                )}
-                <button className="mt-4 px-4 py-2 bg-gray-800 text-white rounded" onClick={() => setShowModal(false)}>Close</button>
-              </div>
+
+                  {bookingResponse.appointment && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-lg">📅 Appointment Details</h3>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <Label className="text-muted-foreground">Day</Label>
+                          <p className="font-medium">{bookingResponse.appointment.day}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Time Slot</Label>
+                          <p className="font-medium capitalize">{bookingResponse.appointment.timeSlot}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Start Time</Label>
+                          <p className="font-medium">{new Date(bookingResponse.appointment.startTime).toLocaleTimeString()}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">End Time</Label>
+                          <p className="font-medium">{new Date(bookingResponse.appointment.endTime).toLocaleTimeString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {bookingResponse.links && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-lg">⚡ Quick Actions</h3>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          asChild
+                          className="w-full bg-green-600 hover:bg-green-700"
+                        >
+                          <a
+                            href={bookingResponse.links.accept}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => {
+                              toast({
+                                title: "✅ Booking Confirmed!",
+                                description: "Your appointment has been successfully booked.",
+                              });
+                              setShowModal(false);
+                            }}
+                          >
+                            ✅ Accept & Confirm Booking
+                          </a>
+                        </Button>
+                        <Button
+                          asChild
+                          variant="outline"
+                          className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                          <a
+                            href={bookingResponse.links.decline}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => {
+                              toast({
+                                title: "❌ Booking Declined",
+                                description: "The appointment slot has been released.",
+                                variant: "destructive",
+                              });
+                              setShowModal(false);
+                            }}
+                          >
+                            ❌ Decline Booking
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t">
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => setShowModal(false)}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
@@ -324,6 +424,8 @@ export default function Booking() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Preferred Start Time removed; backend proposes time and returns links */}
 
                 {/* Service Selection */}
                 <div className="space-y-4">
@@ -431,8 +533,15 @@ export default function Booking() {
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" size="lg">
-                  Book Appointment
+                <Button type="submit" className="w-full" size="lg" disabled={isBooking}>
+                  {isBooking ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Searching for slots...
+                    </>
+                  ) : (
+                    "📅 Book Appointment"
+                  )}
                 </Button>
               </form>
             </CardContent>

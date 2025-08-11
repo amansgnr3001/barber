@@ -12,9 +12,9 @@ import SEO from "@/components/seo/SEO";
 interface Slot {
   _id: string;
   day: string;
-  morning: string;
-  afternoon: string;
-  evening: string;
+  morning: string | null;
+  afternoon: string | null;
+  evening: string | null;
 }
 
 const Slots = () => {
@@ -65,12 +65,13 @@ const Slots = () => {
     setSelectedGender(value);
   };
 
-  const formatTime = (timeString: string) => {
+  const formatTime = (timeString: string | null) => {
+    if (!timeString) return 'Not available';
     const date = new Date(timeString);
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true,
     });
   };
 
@@ -150,9 +151,11 @@ const Slots = () => {
                           <Clock className="h-4 w-4 text-orange-500" />
                           <span className="font-medium">Morning</span>
                         </div>
-                        <Badge variant="outline">
-                          {formatTime(slot.morning)}
-                        </Badge>
+                        {slot.morning ? (
+                          <Badge variant="outline">{formatTime(slot.morning)}</Badge>
+                        ) : (
+                          <Badge variant="secondary">Not available</Badge>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -160,9 +163,11 @@ const Slots = () => {
                           <Clock className="h-4 w-4 text-blue-500" />
                           <span className="font-medium">Afternoon</span>
                         </div>
-                        <Badge variant="outline">
-                          {formatTime(slot.afternoon)}
-                        </Badge>
+                        {slot.afternoon ? (
+                          <Badge variant="outline">{formatTime(slot.afternoon)}</Badge>
+                        ) : (
+                          <Badge variant="secondary">Not available</Badge>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -170,9 +175,11 @@ const Slots = () => {
                           <Clock className="h-4 w-4 text-purple-500" />
                           <span className="font-medium">Evening</span>
                         </div>
-                        <Badge variant="outline">
-                          {formatTime(slot.evening)}
-                        </Badge>
+                        {slot.evening ? (
+                          <Badge variant="outline">{formatTime(slot.evening)}</Badge>
+                        ) : (
+                          <Badge variant="secondary">Not available</Badge>
+                        )}
                       </div>
                     </div>
                   </CardContent>

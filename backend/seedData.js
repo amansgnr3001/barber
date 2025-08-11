@@ -16,6 +16,8 @@ import Services from './models/services.js';
 import Barber from './models/barber.js';
 import Customer from './models/customers.js';
 import Slots from './models/slots.js';
+import Slots1 from './models/slots1.js';
+import Appointment from './models/appointments.js';
 
 // Dummy data for Services
 const dummyServices = [
@@ -185,70 +187,19 @@ const createDummyCustomers = async () => {
   ];
 };
 
-// Dummy data for Slots
-const dummySlots = [
-  {
-    days: "Monday",
-    bookings: [
-      {
-        starting_data: "2024-01-15T10:00:00.000Z",
-        ending_data: "2024-01-15T10:30:00.000Z"
-      },
-      {
-        starting_data: "2024-01-15T14:00:00.000Z",
-        ending_data: "2024-01-15T14:45:00.000Z"
-      }
-    ]
-  },
-  {
-    days: "Tuesday",
-    bookings: [
-      {
-        starting_data: "2024-01-16T11:00:00.000Z",
-        ending_data: "2024-01-16T11:30:00.000Z"
-      },
-      {
-        starting_data: "2024-01-16T15:00:00.000Z",
-        ending_data: "2024-01-16T15:20:00.000Z"
-      }
-    ]
-  },
-  {
-    days: "Wednesday",
-    bookings: [
-      {
-        starting_data: "2024-01-17T10:30:00.000Z",
-        ending_data: "2024-01-17T11:00:00.000Z"
-      },
-      {
-        starting_data: "2024-01-17T16:00:00.000Z",
-        ending_data: "2024-01-17T16:45:00.000Z"
-      }
-    ]
-  },
-  {
-    days: "Thursday",
-    bookings: [
-      {
-        starting_data: "2024-01-18T12:00:00.000Z",
-        ending_data: "2024-01-18T12:30:00.000Z"
-      }
-    ]
-  },
-  {
-    days: "Friday",
-    bookings: [
-      {
-        starting_data: "2024-01-19T13:00:00.000Z",
-        ending_data: "2024-01-19T13:45:00.000Z"
-      },
-      {
-        starting_data: "2024-01-19T17:00:00.000Z",
-        ending_data: "2024-01-19T17:20:00.000Z"
-      }
-    ]
-  }
-];
+// Deterministic Mon–Fri slots
+const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const makeSlotRange = (sh, sm, eh, em) => [{
+  name: 'Available',
+  starting_time: new Date(2000, 0, 1, sh, sm),
+  ending_time: new Date(2000, 0, 1, eh, em)
+}];
+const slotsForWeek = weekDays.map(day => ({
+  day,
+  morning: makeSlotRange(9, 0, 12, 0),
+  afternoon: makeSlotRange(12, 0, 13, 30),
+  evening: makeSlotRange(14, 30, 18, 0)
+}));
 
 // Function to seed all dummy data
 const seedAllData = async () => {
@@ -287,13 +238,51 @@ const seedAllData = async () => {
       console.log('⏭️  Customers data already exists, skipping...');
     }
 
-    // Seed Slots
+    // Seed Slots for male
     const existingSlots = await Slots.countDocuments();
     if (existingSlots === 0) {
-      await Slots.insertMany(dummySlots);
-      console.log('✅ Slots data seeded successfully');
+      await Slots.insertMany(slotsForWeek);
+      console.log('✅ Slots (male) seeded successfully');
     } else {
-      console.log('⏭️  Slots data already exists, skipping...');
+      console.log('⏭️  Slots (male) already exist, skipping...');
+    }
+
+    // Seed Slots1 for female
+    const existingSlots1 = await Slots1.countDocuments();
+    if (existingSlots1 === 0) {
+      await Slots1.insertMany(slotsForWeek);
+      console.log('✅ Slots1 (female) seeded successfully');
+    } else {
+      console.log('⏭️  Slots1 (female) already exist, skipping...');
+    }
+
+    // Seed a few pre-booked appointments to simulate conflicts (leave plenty of room available)
+    const existingAppts = await Appointment.countDocuments();
+    if (existingAppts === 0) {
+      const sample = [
+        // Monday morning 9:00–9:30
+        {
+          customerName: 'Demo User 1', customerPhone: '+1-555-1111', gender: 'male',
+          day: 'Monday', timeSlot: 'morning',
+          startTime: new Date(2000, 0, 3, 9, 0), endTime: new Date(2000, 0, 3, 9, 30), services: []
+        },
+        // Tuesday afternoon 12:00–12:45
+        {
+          customerName: 'Demo User 2', customerPhone: '+1-555-2222', gender: 'female',
+          day: 'Tuesday', timeSlot: 'afternoon',
+          startTime: new Date(2000, 0, 4, 12, 0), endTime: new Date(2000, 0, 4, 12, 45), services: []
+        },
+        // Wednesday evening 16:00–16:30 (4:00 pm)
+        {
+          customerName: 'Demo User 3', customerPhone: '+1-555-3333', gender: 'male',
+          day: 'Wednesday', timeSlot: 'evening',
+          startTime: new Date(2000, 0, 5, 16, 0), endTime: new Date(2000, 0, 5, 16, 30), services: []
+        }
+      ];
+      await Appointment.insertMany(sample);
+      console.log('✅ Sample appointments seeded');
+    } else {
+      console.log('⏭️  Appointments already exist, skipping...');
     }
 
     console.log('🎉 All dummy data seeding completed!');
@@ -357,6 +346,5 @@ export {
   clearAllData,
   dummyServices,
   createDummyBarbers,
-  createDummyCustomers,
-  dummySlots
+  createDummyCustomers
 }; 

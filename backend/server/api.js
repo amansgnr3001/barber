@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import Services from '../models/services.js';
 import Slots from '../models/slots.js';
 import Slots1 from '../models/slots1.js';
+import Appointment from '../models/appointments.js';
 
 // JWT Authentication Middleware
 import jwt from 'jsonwebtoken';
@@ -145,34 +146,129 @@ app.get('/api/services/:gender', async (req, res) => {
 
 
 
+// Retrieve weekly slots (male) with availability filtering
+app.get('/api/slots', authenticateToken, async (req, res) => {
+  try {
+    const docs = await Slots.find({}).lean();
+    const mapSlot = (arr) => {
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      const slot = arr[0];
+      if (!slot || slot.name !== 'Available') return null;
+      return slot.starting_time;
+    };
+    const result = docs.map((doc) => ({
+      _id: doc._id,
+      day: doc.day,
+      morning: mapSlot(doc.morning),
+      afternoon: mapSlot(doc.afternoon),
+      evening: mapSlot(doc.evening),
+    }));
+    res.json(result);
+  } catch (error) {
+    console.error('Error retrieving slots (male):', error);
+    res.status(500).json({ error: 'Error retrieving slots' });
+  }
+});
+
+// Retrieve weekly slots (female) with availability filtering
+app.get('/api/slots1', authenticateToken, async (req, res) => {
+  try {
+    const docs = await Slots1.find({}).lean();
+    const mapSlot = (arr) => {
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      const slot = arr[0];
+      if (!slot || slot.name !== 'Available') return null;
+      return slot.starting_time;
+    };
+    const result = docs.map((doc) => ({
+      _id: doc._id,
+      day: doc.day,
+      morning: mapSlot(doc.morning),
+      afternoon: mapSlot(doc.afternoon),
+      evening: mapSlot(doc.evening),
+    }));
+    res.json(result);
+  } catch (error) {
+    console.error('Error retrieving slots (female):', error);
+    res.status(500).json({ error: 'Error retrieving slots' });
+  }
+});
+
+// Accept appointment link -> creates an appointment and confirms
+app.get('/api/appointments/accept', async (req, res) => {
+  try {
+    const { day, timeSlot, start, end, name, phone, gender, services } = req.query;
+    if (!day || !timeSlot || !start || !end || !name || !phone || !gender) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    const servicesArr = typeof services === 'string' ? services.split(',') : [];
+
+    // Basic validation of overlap before saving
+    const overlap = await Appointment.findOne({
+      day,
+      timeSlot,
+      $or: [
+        { startTime: { $lt: new Date(end) }, endTime: { $gt: new Date(start) } },
+      ]
+    });
+    if (overlap) {
+      return res.status(409).json({ error: 'Time no longer available' });
+    }
+
+    const doc = await Appointment.create({
+      customerName: String(name),
+      customerPhone: String(phone),
+      gender: String(gender).toLowerCase(),
+      day: String(day),
+      timeSlot: String(timeSlot),
+      startTime: new Date(String(start)),
+      endTime: new Date(String(end)),
+      services: servicesArr,
+      status: 'booked'
+    });
+
+    res.json({ success: true, message: 'Appointment confirmed', appointment: doc });
+  } catch (error) {
+    console.error('Error accepting appointment:', error);
+    res.status(500).json({ error: 'Error confirming appointment' });
+  }
+});
+
+// Decline appointment link -> no-op confirmation
+app.get('/api/appointments/decline', (req, res) => {
+  res.json({ success: true, message: 'Appointment declined by user' });
+});
+
 app.get('/api/check-reset-slots', authenticateToken, async (req, res) => {
   try {
     const today = new Date();
     const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
     
     if (dayOfWeek === 0) { // Sunday
-      // Delete all documents from slots collection
+      // Delete all documents from slots collections (male and female)
       await Slots.deleteMany({});
+      await Slots1.deleteMany({});
       
       // Add 5 documents for Monday to Friday
       const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
       
-      const makeSlot = (hour, minute) => [{
+      const makeSlotRange = (startHour, startMinute, endHour, endMinute) => [{
         name: "Available",
-        starting_time: new Date().setHours(hour, minute, 0, 0),
-        ending_time: new Date().setHours(hour + 1, minute, 0, 0)  // Set ending time to 1 hour after starting time
+        starting_time: new Date(new Date().setHours(startHour, startMinute, 0, 0)),
+        ending_time: new Date(new Date().setHours(endHour, endMinute, 0, 0))
       }];
 
       const newSlots = weekDays.map(day => ({
         day: day,
-        morning: makeSlot(9, 0),    // 9:00 AM - 10:00 AM
-        afternoon: makeSlot(12, 0),  // 12:00 PM - 1:00 PM
-        evening: makeSlot(14, 30)    // 2:30 PM - 3:30 PM
+        morning: makeSlotRange(9, 0, 12, 0),        // 9:00 AM - 12:00 PM
+        afternoon: makeSlotRange(12, 0, 13, 30),    // 12:00 PM - 1:30 PM
+        evening: makeSlotRange(14, 30, 18, 0)       // 2:30 PM - 6:00 PM
       }));
       
       await Slots.insertMany(newSlots);
+      await Slots1.insertMany(newSlots);
       
-      res.json({ message: 'Slots reset successfully for the new week' });
+      res.json({ message: 'Slots reset successfully for the new week (male & female)' });
     } else {
       res.json({ message: 'Today is not Sunday, no reset needed' });
     }
@@ -206,36 +302,73 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
       evening: { hour: 18, minute: 0 } // 6:00 PM
     };
     
-    // Helper function to check if slot is available
-    const checkSlotAvailability = (slots, totalTimeMinutes) => {
+    // Check if the requested service duration can fit within the slot window considering existing appointments
+    const checkSlotAvailability = async (day, timeSlot, slots, totalTimeMinutes) => {
       if (!Array.isArray(slots) || slots.length === 0) return false;
       
       // Check the first slot in the array
       const slot = slots[0];
       if (slot.name !== "Available") return false;
       
-      const startTime = new Date(slot.starting_time);
-      const endTime = new Date(slot.ending_time);
+      const windowStart = new Date(slot.starting_time);
+      const windowEnd = new Date(slot.ending_time);
+
+      // Fetch existing appointments for the same day and time slot
+      const existing = await Appointment.find({ day, timeSlot }).lean();
+
+      // Build a list of blocked intervals
+      const blocked = existing.map(a => ({ start: new Date(a.startTime), end: new Date(a.endTime) }));
+
+      // Try to place the new appointment at the earliest available time in the window
+      const durationMs = totalTimeMinutes * 60 * 1000;
+      let candidateStart = new Date(windowStart);
+
+      // Sort blocked by start time to scan gaps
+      blocked.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+      for (const b of blocked) {
+        // If candidate fits entirely before this blocked interval
+        const candidateEnd = new Date(candidateStart.getTime() + durationMs);
+        if (candidateEnd <= b.start && candidateStart >= windowStart) {
+          return { start: candidateStart, end: candidateEnd };
+        }
+        // Move candidate start to end of this blocked interval if overlapping
+        if (candidateStart < b.end) {
+          candidateStart = new Date(b.end);
+        }
+        // If candidate start moved beyond window end, no availability
+        if (candidateStart.getTime() + durationMs > windowEnd.getTime()) {
+          return false;
+        }
+      }
+
+      // After processing all blocked intervals, try to fit at the end
+      const finalEnd = new Date(candidateStart.getTime() + durationMs);
+      if (candidateStart >= windowStart && finalEnd <= windowEnd) {
+        return { start: candidateStart, end: finalEnd };
+      }
       
-      // Calculate available time in minutes
-      const availableMinutes = (endTime - startTime) / (1000 * 60);
-      return availableMinutes >= totalTimeMinutes;
+      return false;
     };
     
     // Helper function to send booking response
-    const sendBookingResponse = (slots, day, timeSlot) => {
-      const slot = slots[0]; // Get the first available slot
-      const startTime = new Date(slot.starting_time);
-      const endTime = new Date(slot.ending_time);
+    const sendBookingResponse = (day, timeSlot, proposed) => {
+      const startTime = proposed.start;
+      const endTime = proposed.end;
       
+      const base = `${req.protocol}://${req.get('host')}`;
       return res.json({
         success: true,
-        message: `Your appointment is scheduled for ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()} on ${day}`,
+        message: `A slot is available from ${startTime.toLocaleTimeString()} to ${endTime.toLocaleTimeString()} on ${day}. Please accept to confirm.`,
         appointment: {
           day: day,
           timeSlot: timeSlot,
           startTime: startTime,
           endTime: endTime
+        },
+        links: {
+          accept: `${base}/api/appointments/accept?day=${encodeURIComponent(day)}&timeSlot=${encodeURIComponent(timeSlot)}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&name=${encodeURIComponent(fullName)}&phone=${encodeURIComponent(phoneNumber)}&gender=${encodeURIComponent(gender)}&services=${encodeURIComponent(services.join(','))}`,
+          decline: `${base}/api/appointments/decline`
         }
       });
     };
@@ -253,14 +386,14 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
       
       const slots = daySlot[preferredTime];
       
-      if (!checkSlotAvailability(slots, totalTimeMinutes)) {
+      const proposed = await checkSlotAvailability(preferredDay, preferredTime, slots, totalTimeMinutes);
+      if (!proposed) {
         return res.json({ 
           success: false,
-          message: `All slots are booked for ${preferredDay} ${preferredTime}` 
+          message: `No available time found within ${preferredDay} ${preferredTime}` 
         });
       }
-      
-      return sendBookingResponse(slots, preferredDay, preferredTime);
+      return sendBookingResponse(preferredDay, preferredTime, proposed);
     }
     
     // Case 2: Any day but specific slot
@@ -273,8 +406,9 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
         if (daySlot) {
           const slots = daySlot[preferredTime];
           
-          if (checkSlotAvailability(slots, totalTimeMinutes)) {
-            return sendBookingResponse(slots, day, preferredTime);
+          const proposed = await checkSlotAvailability(day, preferredTime, slots, totalTimeMinutes);
+          if (proposed) {
+            return sendBookingResponse(day, preferredTime, proposed);
           }
         }
       }
@@ -297,8 +431,9 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
           for (const timeSlot of timeSlots) {
             const slots = daySlot[timeSlot];
             
-            if (checkSlotAvailability(slots, totalTimeMinutes)) {
-              return sendBookingResponse(slots, day, timeSlot);
+            const proposed = await checkSlotAvailability(day, timeSlot, slots, totalTimeMinutes);
+            if (proposed) {
+              return sendBookingResponse(day, timeSlot, proposed);
             }
           }
         }
@@ -326,8 +461,9 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
       for (const timeSlot of timeSlots) {
         const slots = daySlot[timeSlot];
         
-        if (checkSlotAvailability(slots, totalTimeMinutes)) {
-          return sendBookingResponse(slots, preferredDay, timeSlot);
+        const proposed = await checkSlotAvailability(preferredDay, timeSlot, slots, totalTimeMinutes);
+        if (proposed) {
+          return sendBookingResponse(preferredDay, timeSlot, proposed);
         }
       }
       
@@ -358,8 +494,8 @@ const checkAndResetSlots = async () => {
       
       const makeSlot = (hour, minute) => [{
         name: "Available",
-        starting_time: new Date().setHours(hour, minute, 0, 0),
-        ending_time: new Date().setHours(hour + 1, minute, 0, 0)
+        starting_time: new Date(new Date().setHours(hour, minute, 0, 0)),
+        ending_time: new Date(new Date().setHours(hour + 1, minute, 0, 0))
       }];
 
       const newSlots = weekDays.map(day => ({
