@@ -1,14 +1,12 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { LogOut } from "lucide-react";
 
 const navButtons: { label: string; href: string; variant: "default" | "outline" }[] = [
   { label: "Book Now", href: "/booking", variant: "default" },
   { label: "Services", href: "/services", variant: "outline" },
-  { label: "Slots", href: "/slots", variant: "outline" },
-  { label: "Check Availability", href: "#availability", variant: "outline" },
   { label: "About Us", href: "#about", variant: "outline" },
   { label: "Developer Team", href: "#team", variant: "outline" },
 ];
@@ -16,6 +14,30 @@ const navButtons: { label: string; href: string; variant: "default" | "outline" 
 const Header: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [activePage, setActivePage] = useState<string>('');
+
+  // Update active page based on current route
+  useEffect(() => {
+    const currentPath = location.pathname;
+    if (currentPath === '/booking') {
+      setActivePage('Book Now');
+    } else if (currentPath === '/services') {
+      setActivePage('Services');
+    } else if (currentPath === '/' || currentPath === '') {
+      // Check if we're on homepage and looking at specific sections
+      const hash = location.hash;
+      if (hash === '#about') {
+        setActivePage('About Us');
+      } else if (hash === '#team') {
+        setActivePage('Developer Team');
+      } else {
+        setActivePage(''); // Homepage, no specific section
+      }
+    } else {
+      setActivePage('');
+    }
+  }, [location]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -33,7 +55,10 @@ const Header: React.FC = () => {
 
   const handleNavClick = (e: React.MouseEvent, label: string, href: string) => {
     e.preventDefault();
-    
+
+    // Update active page immediately for better UX
+    setActivePage(label);
+
     if (label === "Services") {
       // Navigate to Services page
       console.log('Navigating to Services page');
@@ -42,12 +67,8 @@ const Header: React.FC = () => {
       // Navigate to Booking page
       console.log('Navigating to Booking page');
       navigate('/booking');
-    } else if (label === "Slots") {
-      // Navigate to Slots page
-      console.log('Navigating to Slots page');
-      navigate('/slots');
     } else {
-      // Handle other navigation buttons
+      // Handle other navigation buttons (About Us, Developer Team)
       toast({
         title: "Demo Navigation",
         description: `This is a demo ${label} button. The section is already visible on the page.`,
@@ -68,16 +89,20 @@ const Header: React.FC = () => {
           Barber Suite
         </button>
         <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
-          {navButtons.map((btn) => (
-            <Button 
-              key={btn.href} 
-              size="sm" 
-              variant={btn.variant}
-              onClick={(e) => handleNavClick(e, btn.label, btn.href)}
-            >
-              {btn.label}
-            </Button>
-          ))}
+          {navButtons.map((btn) => {
+            const isActive = activePage === btn.label;
+            return (
+              <Button
+                key={btn.href}
+                size="sm"
+                variant={isActive ? "default" : btn.variant}
+                onClick={(e) => handleNavClick(e, btn.label, btn.href)}
+                className={isActive ? "bg-black text-white hover:bg-black/90" : ""}
+              >
+                {btn.label}
+              </Button>
+            );
+          })}
           <Button 
             size="sm" 
             variant="ghost"

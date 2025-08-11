@@ -3,7 +3,6 @@ import SEO from "@/components/seo/SEO";
 import Hero from "@/components/sections/Hero";
 import Services from "@/components/sections/Services";
 import BookAppointment from "@/components/sections/BookAppointment";
-import Availability from "@/components/sections/Availability";
 import AboutUs from "@/components/sections/AboutUs";
 import DeveloperTeam from "@/components/sections/DeveloperTeam";
 
@@ -19,7 +18,6 @@ const Index = () => {
         <Hero />
         <Services id="services" />
         <BookAppointment id="book" />
-        <Availability id="availability" />
         <AboutUs id="about" />
         <DeveloperTeam id="team" />
       </main>

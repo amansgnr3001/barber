@@ -197,6 +197,7 @@ app.get('/api/slots1', authenticateToken, async (req, res) => {
 // Accept appointment link -> creates an appointment and confirms
 app.get('/api/appointments/accept', async (req, res) => {
   try {
+    console.log('aman');
     const { day, timeSlot, start, end, name, phone, gender, services } = req.query;
     if (!day || !timeSlot || !start || !end || !name || !phone || !gender) {
       return res.status(400).json({ error: 'Missing required parameters' });
@@ -227,7 +228,19 @@ app.get('/api/appointments/accept', async (req, res) => {
       status: 'booked'
     });
 
-    res.json({ success: true, message: 'Appointment confirmed', appointment: doc });
+    res.json({
+      success: true,
+      message: `🎉 Appointment confirmed for ${name} on ${day} ${timeSlot}! Your booking ID is ${doc._id.toString().slice(-6)}.`,
+      appointment: {
+        id: doc._id,
+        customerName: doc.customerName,
+        day: doc.day,
+        timeSlot: doc.timeSlot,
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        status: doc.status
+      }
+    });
   } catch (error) {
     console.error('Error accepting appointment:', error);
     res.status(500).json({ error: 'Error confirming appointment' });
@@ -236,7 +249,12 @@ app.get('/api/appointments/accept', async (req, res) => {
 
 // Decline appointment link -> no-op confirmation
 app.get('/api/appointments/decline', (req, res) => {
-  res.json({ success: true, message: 'Appointment declined by user' });
+  const { name, day, timeSlot } = req.query;
+  const message = name && day && timeSlot
+    ? `❌ Appointment declined for ${name} on ${day} ${timeSlot}. The time slot has been released and is now available for other bookings.`
+    : '❌ Appointment declined. The time slot has been released.';
+
+  res.json({ success: true, message });
 });
 
 app.get('/api/check-reset-slots', authenticateToken, async (req, res) => {
@@ -280,6 +298,7 @@ app.get('/api/check-reset-slots', authenticateToken, async (req, res) => {
 
 app.post('/api/book-appointment', authenticateToken, async (req, res) => {
   try {
+    console.log('tiru');
     const { fullName, phoneNumber, gender, preferredDay, preferredTime, services } = req.body;
     
     // Retrieve service details and calculate total time
@@ -305,13 +324,20 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     // Check if the requested service duration can fit within the slot window considering existing appointments
     const checkSlotAvailability = async (day, timeSlot, slots, totalTimeMinutes) => {
       if (!Array.isArray(slots) || slots.length === 0) return false;
-      
+
       // Check the first slot in the array
       const slot = slots[0];
       if (slot.name !== "Available") return false;
-      
+
       const windowStart = new Date(slot.starting_time);
       const windowEnd = new Date(slot.ending_time);
+
+      // CRITICAL FIX: Check if service duration exceeds slot capacity
+      const slotDurationMinutes = (windowEnd - windowStart) / (1000 * 60);
+      if (totalTimeMinutes > slotDurationMinutes) {
+        console.log(`❌ Service duration (${totalTimeMinutes}min) exceeds slot capacity (${slotDurationMinutes}min)`);
+        return false;
+      }
 
       // Fetch existing appointments for the same day and time slot
       const existing = await Appointment.find({ day, timeSlot }).lean();
@@ -388,9 +414,20 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
       
       const proposed = await checkSlotAvailability(preferredDay, preferredTime, slots, totalTimeMinutes);
       if (!proposed) {
-        return res.json({ 
+        // Check if it's a duration issue
+        const slot = slots[0];
+        const slotDurationMinutes = (new Date(slot.ending_time) - new Date(slot.starting_time)) / (1000 * 60);
+
+        if (totalTimeMinutes > slotDurationMinutes) {
+          return res.json({
+            success: false,
+            message: `Selected services require ${totalTimeMinutes} minutes, but ${preferredDay} ${preferredTime} slot only has ${slotDurationMinutes} minutes available. Please choose fewer services or a different time slot.`
+          });
+        }
+
+        return res.json({
           success: false,
-          message: `No available time found within ${preferredDay} ${preferredTime}` 
+          message: `No available time found within ${preferredDay} ${preferredTime} due to existing bookings.`
         });
       }
       return sendBookingResponse(preferredDay, preferredTime, proposed);
@@ -409,6 +446,13 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
           const proposed = await checkSlotAvailability(day, preferredTime, slots, totalTimeMinutes);
           if (proposed) {
             return sendBookingResponse(day, preferredTime, proposed);
+          }
+
+          // Check if it's a duration issue for this day
+          const slot = slots[0];
+          const slotDurationMinutes = (new Date(slot.ending_time) - new Date(slot.starting_time)) / (1000 * 60);
+          if (totalTimeMinutes > slotDurationMinutes) {
+            console.log(`⚠️ ${day} ${preferredTime}: Service duration (${totalTimeMinutes}min) exceeds slot capacity (${slotDurationMinutes}min)`);
           }
         }
       }

@@ -21,9 +21,9 @@ const BookAppointment: React.FC<SectionProps> = ({ id }) => {
       toast({ title: "Missing details", description: "Please fill all fields." });
       return;
     }
-    toast({ 
-      title: "Demo Feature", 
-      description: `This is a demo booking. In a real app, ${name}'s ${service} appointment on ${date} at ${time} would be processed.` 
+    toast({
+      title: "Demo Feature",
+      description: `This is a demo booking. In a real app, ${name}'s ${service} appointment on ${date} at ${time} would be processed.`
     });
     // Clear form after demo submission
     setName("");
