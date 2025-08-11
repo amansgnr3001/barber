@@ -26,9 +26,12 @@ app.use(express.json());
 
 
 // Test route
+console.log('✅ Registering test route: GET /test');
 app.get('/test', (req, res) => {
   res.json({ message: 'Server is working!' });
 });
+
+
 
 //
 
@@ -51,6 +54,104 @@ const authenticateToken = (req, res, next) => {
     res.status(400).json({ error: 'Invalid token' });
   }
 };
+
+// Cancel appointment route with /api prefix
+console.log('✅ Registering cancel appointment route: DELETE /api/cancelappointment/:id');
+app.delete('/api/cancelappointment/:id', authenticateToken, async (req, res) => {
+  console.log(`\n🎯 ===== CANCEL APPOINTMENT ROUTE HIT =====`);
+  console.log(`🗑️ DELETE /api/cancelappointment/:id route accessed`);
+  console.log(`📅 Timestamp: ${new Date().toLocaleString()}`);
+  console.log(`🆔 Request IP: ${req.ip || 'unknown'}`);
+  console.log(`🔑 Authorization header: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+
+  try {
+    const appointmentId = req.params.id;
+    console.log(`🗑️ Cancel request received for appointment: ${appointmentId}`);
+
+    // Validate appointment ID format
+    if (!appointmentId || appointmentId.length < 12) {
+      console.log(`❌ Invalid appointment ID format: ${appointmentId}`);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid appointment ID format'
+      });
+    }
+
+    // Find the appointment first to get details for slot update
+    const appointment = await Appointment.findById(appointmentId);
+
+    if (!appointment) {
+      console.log(`❌ Appointment not found in database: ${appointmentId}`);
+      return res.status(404).json({
+        success: false,
+        error: 'Appointment not found. It may have already been cancelled.'
+      });
+    }
+
+    console.log(`📋 Found appointment: ${appointment.customerName} on ${appointment.day} ${appointment.timeSlot}`);
+
+    // Determine which slots collection to update based on gender
+    const SlotsSchema = appointment.gender?.toLowerCase() === 'male' ? Slots : Slots1;
+    console.log(`📊 Using slots collection for gender: ${appointment.gender}`);
+
+    // Delete the appointment
+    const deletedAppointment = await Appointment.findByIdAndDelete(appointmentId);
+
+    if (!deletedAppointment) {
+      console.log(`❌ Failed to delete appointment from database: ${appointmentId}`);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete appointment from database'
+      });
+    }
+
+    console.log(`✅ Appointment deleted from database: ${appointmentId}`);
+
+    // Update the corresponding slot to make it available again
+    try {
+      const slotUpdate = await SlotsSchema.updateOne(
+        { day: appointment.day },
+        { $set: { [`${appointment.timeSlot}.available`]: true } }
+      );
+
+      console.log(`✅ Slot update successful:`, slotUpdate);
+
+      if (slotUpdate.matchedCount === 0) {
+        console.log(`⚠️ Warning: No slot document found for day ${appointment.day}`);
+      }
+
+    } catch (slotError) {
+      console.error(`❌ Error updating slot availability:`, slotError);
+      // Continue anyway since appointment is already deleted
+    }
+
+    // Prepare success response
+    const responseData = {
+      success: true,
+      message: `✅ Appointment cancelled successfully for ${appointment.customerName} on ${appointment.day} ${appointment.timeSlot}. The time slot is now available for booking.`,
+      cancelledAppointment: {
+        id: appointment._id.toString(),
+        customerName: appointment.customerName,
+        customerPhone: appointment.customerPhone,
+        day: appointment.day,
+        timeSlot: appointment.timeSlot,
+        gender: appointment.gender,
+        cancelledAt: new Date().toISOString()
+      }
+    };
+
+    console.log(`🎉 Cancel operation completed successfully for: ${appointmentId}`);
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('❌ Unexpected error in cancel appointment:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error while cancelling appointment',
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later'
+    });
+  }
+});
 
 // Login Route
 app.post('/api/login', async (req, res) => {
@@ -94,6 +195,58 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Error logging in' });
+  }
+});
+
+// Cancel appointment route (working version)
+console.log('✅ Registering WORKING cancel route: DELETE /api/cancel/:id');
+app.delete('/api/cancel/:id', authenticateToken, async (req, res) => {
+  console.log(`\n🎯 ===== CANCEL ROUTE HIT =====`);
+  console.log(`🗑️ DELETE /api/cancel/:id accessed`);
+
+  try {
+    const appointmentId = req.params.id;
+    console.log(`🗑️ Cancelling appointment: ${appointmentId}`);
+
+    // Find and delete the appointment
+    const appointment = await Appointment.findById(appointmentId);
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Appointment not found'
+      });
+    }
+
+    // Delete the appointment
+    await Appointment.findByIdAndDelete(appointmentId);
+
+    // Update slot availability
+    const SlotsSchema = appointment.gender?.toLowerCase() === 'male' ? Slots : Slots1;
+    await SlotsSchema.updateOne(
+      { day: appointment.day },
+      { $set: { [`${appointment.timeSlot}.available`]: true } }
+    );
+
+    console.log(`✅ Appointment cancelled successfully: ${appointmentId}`);
+
+    res.json({
+      success: true,
+      message: `Appointment cancelled successfully for ${appointment.customerName}`,
+      cancelledAppointment: {
+        id: appointment._id.toString(),
+        customerName: appointment.customerName,
+        day: appointment.day,
+        timeSlot: appointment.timeSlot
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Cancel error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to cancel appointment'
+    });
   }
 });
 
@@ -228,22 +381,82 @@ app.get('/api/appointments/accept', async (req, res) => {
       status: 'booked'
     });
 
+    console.log(`✅ Appointment created with ID: ${doc._id}`);
+
     res.json({
       success: true,
       message: `🎉 Appointment confirmed for ${name} on ${day} ${timeSlot}! Your booking ID is ${doc._id.toString().slice(-6)}.`,
       appointment: {
-        id: doc._id,
+        id: doc._id.toString(), // Ensure ID is always a string
+        _id: doc._id.toString(), // Backup ID field
         customerName: doc.customerName,
+        customerPhone: doc.customerPhone,
+        gender: doc.gender,
         day: doc.day,
         timeSlot: doc.timeSlot,
         startTime: doc.startTime,
         endTime: doc.endTime,
-        status: doc.status
+        status: doc.status,
+        services: doc.services
       }
     });
   } catch (error) {
     console.error('Error accepting appointment:', error);
     res.status(500).json({ error: 'Error confirming appointment' });
+  }
+});
+
+// Cancel appointment route (using same pattern as accept route)
+app.delete('/api/appointments/cancel/:id', authenticateToken, async (req, res) => {
+  console.log(`\n🎯 ===== CANCEL APPOINTMENT ROUTE HIT =====`);
+  console.log(`🗑️ DELETE /api/appointments/cancel/:id accessed`);
+
+  try {
+    const appointmentId = req.params.id;
+    console.log(`🗑️ Cancelling appointment: ${appointmentId}`);
+
+    // Find the appointment
+    const appointment = await Appointment.findById(appointmentId);
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Appointment not found'
+      });
+    }
+
+    console.log(`📋 Found appointment: ${appointment.customerName} on ${appointment.day} ${appointment.timeSlot}`);
+
+    // Delete the appointment
+    await Appointment.findByIdAndDelete(appointmentId);
+
+    // Update slot availability
+    const SlotsSchema = appointment.gender?.toLowerCase() === 'male' ? Slots : Slots1;
+    await SlotsSchema.updateOne(
+      { day: appointment.day },
+      { $set: { [`${appointment.timeSlot}.available`]: true } }
+    );
+
+    console.log(`✅ Appointment cancelled successfully: ${appointmentId}`);
+
+    res.json({
+      success: true,
+      message: `✅ Appointment cancelled successfully for ${appointment.customerName} on ${appointment.day} ${appointment.timeSlot}. The time slot is now available for booking.`,
+      cancelledAppointment: {
+        id: appointment._id.toString(),
+        customerName: appointment.customerName,
+        day: appointment.day,
+        timeSlot: appointment.timeSlot,
+        cancelledAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Cancel error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to cancel appointment'
+    });
   }
 });
 

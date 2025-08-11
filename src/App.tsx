@@ -9,6 +9,7 @@ import BarberLogin from "./pages/BarberLogin";
 import Index from "./pages/Index";
 import Services from "./pages/Services";
 import Booking from "./pages/Booking";
+import Status from "./pages/Status";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,11 @@ const App = () => (
           <Route path="/booking" element={
             <ProtectedRoute>
               <Booking />
+            </ProtectedRoute>
+          } />
+          <Route path="/status" element={
+            <ProtectedRoute>
+              <Status />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

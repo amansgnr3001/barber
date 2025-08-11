@@ -119,8 +119,8 @@ export default function Booking() {
   const [showModal, setShowModal] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
-  const [showJsonModal, setShowJsonModal] = useState(false);
-  const [jsonResponseData, setJsonResponseData] = useState<any>(null);
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,22 +206,35 @@ export default function Booking() {
       const response = await fetch(bookingResponse.links.accept);
       const data = await response.json();
 
-      // Show JSON response in popup
-      setJsonResponseData({
+      // Store response in localStorage for Status page
+      const responseData = {
         action: "ACCEPT",
         timestamp: new Date().toISOString(),
         response: data,
         originalBooking: bookingResponse,
-        httpStatus: response.status,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-      setShowJsonModal(true);
+        httpStatus: response.status
+      };
+
+      localStorage.setItem('lastAppointmentResponse', JSON.stringify(responseData));
+
+      if (data.success) {
+        toast({
+          title: "✅ Appointment Confirmed!",
+          description: "Your appointment has been successfully booked. Check the Status page for details.",
+        });
+      } else {
+        toast({
+          title: "❌ Booking Failed",
+          description: data.error || data.message || "Failed to confirm appointment.",
+          variant: "destructive",
+        });
+      }
       setShowModal(false);
       setBookingResponse(null);
 
     } catch (error: any) {
-      // Show error JSON response
-      setJsonResponseData({
+      // Store error response in localStorage
+      const errorData = {
         action: "ACCEPT",
         timestamp: new Date().toISOString(),
         error: true,
@@ -230,8 +243,15 @@ export default function Booking() {
           error: error.message || "Failed to process appointment confirmation"
         },
         originalBooking: bookingResponse
+      };
+
+      localStorage.setItem('lastAppointmentResponse', JSON.stringify(errorData));
+
+      toast({
+        title: "❌ Error",
+        description: error.message || "Failed to process appointment confirmation.",
+        variant: "destructive",
       });
-      setShowJsonModal(true);
       setShowModal(false);
     } finally {
       setIsProcessingAction(false);
@@ -246,22 +266,36 @@ export default function Booking() {
       const response = await fetch(bookingResponse.links.decline);
       const data = await response.json();
 
-      // Show JSON response in popup
-      setJsonResponseData({
+      // Store response in localStorage for Status page
+      const responseData = {
         action: "DECLINE",
         timestamp: new Date().toISOString(),
         response: data,
         originalBooking: bookingResponse,
-        httpStatus: response.status,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-      setShowJsonModal(true);
+        httpStatus: response.status
+      };
+
+      localStorage.setItem('lastAppointmentResponse', JSON.stringify(responseData));
+
+      if (data.success) {
+        toast({
+          title: "❌ Appointment Declined",
+          description: "The appointment slot has been released. Check Status page for details.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "❌ Error",
+          description: data.error || data.message || "Failed to decline appointment.",
+          variant: "destructive",
+        });
+      }
       setShowModal(false);
       setBookingResponse(null);
 
     } catch (error: any) {
-      // Show error JSON response
-      setJsonResponseData({
+      // Store error response in localStorage
+      const errorData = {
         action: "DECLINE",
         timestamp: new Date().toISOString(),
         error: true,
@@ -270,8 +304,15 @@ export default function Booking() {
           error: error.message || "Failed to process appointment decline"
         },
         originalBooking: bookingResponse
+      };
+
+      localStorage.setItem('lastAppointmentResponse', JSON.stringify(errorData));
+
+      toast({
+        title: "❌ Error",
+        description: error.message || "Failed to process appointment decline.",
+        variant: "destructive",
       });
-      setShowJsonModal(true);
       setShowModal(false);
     } finally {
       setIsProcessingAction(false);
@@ -414,178 +455,6 @@ export default function Booking() {
                     >
                       Close
                     </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* JSON Response Modal */}
-          {showJsonModal && jsonResponseData && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-              <Card className="w-full max-w-5xl max-h-[90vh] overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>
-                      {jsonResponseData.action === 'ACCEPT' ? '✅ Appointment Confirmed' : '❌ Appointment Declined'}
-                      {jsonResponseData.error && " - Error"}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setShowJsonModal(false);
-                        setJsonResponseData(null);
-                      }}
-                      className="h-6 w-6 p-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Status Message */}
-                  <div className={`p-4 border rounded-lg ${
-                    jsonResponseData.error
-                      ? 'bg-red-50 border-red-200'
-                      : jsonResponseData.action === 'ACCEPT'
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-orange-50 border-orange-200'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">
-                        {jsonResponseData.error
-                          ? '❌'
-                          : jsonResponseData.action === 'ACCEPT'
-                            ? '✅'
-                            : '❌'
-                        }
-                      </span>
-                      <div>
-                        <p className={`font-medium ${
-                          jsonResponseData.error
-                            ? 'text-red-800'
-                            : jsonResponseData.action === 'ACCEPT'
-                              ? 'text-green-800'
-                              : 'text-orange-800'
-                        }`}>
-                          {jsonResponseData.response?.message || 'Action completed'}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(jsonResponseData.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Appointment Details */}
-                  {jsonResponseData.response?.appointment && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold flex items-center gap-2">
-                        📅 Appointment Details
-                      </h3>
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <h4 className="font-medium text-muted-foreground">Customer Information</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium w-20">Name:</span>
-                              <span className="text-sm">{jsonResponseData.response.appointment.customerName}</span>
-                            </div>
-                            {jsonResponseData.response.appointment.customerPhone && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium w-20">Phone:</span>
-                                <span className="text-sm">{jsonResponseData.response.appointment.customerPhone}</span>
-                              </div>
-                            )}
-                            {jsonResponseData.response.appointment.gender && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium w-20">Gender:</span>
-                                <span className="text-sm capitalize">{jsonResponseData.response.appointment.gender}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <h4 className="font-medium text-muted-foreground">Booking Information</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium w-20">Day:</span>
-                              <span className="text-sm">{jsonResponseData.response.appointment.day}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium w-20">Time Slot:</span>
-                              <span className="text-sm capitalize">{jsonResponseData.response.appointment.timeSlot}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium w-20">Status:</span>
-                              <Badge className={jsonResponseData.response.appointment.status === 'booked' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                                {jsonResponseData.response.appointment.status}
-                              </Badge>
-                            </div>
-                            {jsonResponseData.response.appointment.id && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium w-20">Booking ID:</span>
-                                <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                                  {jsonResponseData.response.appointment.id.toString().slice(-8)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {(jsonResponseData.response.appointment.startTime || jsonResponseData.response.appointment.endTime) && (
-                        <div className="pt-4 border-t">
-                          <h4 className="font-medium text-muted-foreground mb-2">Time Details</h4>
-                          <div className="grid md:grid-cols-2 gap-4">
-                            {jsonResponseData.response.appointment.startTime && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">Start Time:</span>
-                                <span className="text-sm">{new Date(jsonResponseData.response.appointment.startTime).toLocaleString()}</span>
-                              </div>
-                            )}
-                            {jsonResponseData.response.appointment.endTime && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">End Time:</span>
-                                <span className="text-sm">{new Date(jsonResponseData.response.appointment.endTime).toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="pt-6 border-t">
-                    <div className="flex justify-end gap-3">
-                      {jsonResponseData.action === 'ACCEPT' && !jsonResponseData.error && (
-                        <Button
-                          onClick={() => {
-                            toast({
-                              title: "🎉 Success!",
-                              description: "Your appointment has been confirmed and saved to the system."
-                            });
-                            setShowJsonModal(false);
-                            setJsonResponseData(null);
-                          }}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          ✅ Got it!
-                        </Button>
-                      )}
-                      <Button
-                        onClick={() => {
-                          setShowJsonModal(false);
-                          setJsonResponseData(null);
-                        }}
-                        variant="outline"
-                      >
-                        Close
-                      </Button>
-                    </div>
                   </div>
                 </CardContent>
               </Card>

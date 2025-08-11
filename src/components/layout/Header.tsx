@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 
 const navButtons: { label: string; href: string; variant: "default" | "outline" }[] = [
   { label: "Book Now", href: "/booking", variant: "default" },
+  { label: "Status", href: "/status", variant: "outline" },
   { label: "Services", href: "/services", variant: "outline" },
   { label: "About Us", href: "#about", variant: "outline" },
   { label: "Developer Team", href: "#team", variant: "outline" },
@@ -22,6 +23,8 @@ const Header: React.FC = () => {
     const currentPath = location.pathname;
     if (currentPath === '/booking') {
       setActivePage('Book Now');
+    } else if (currentPath === '/status') {
+      setActivePage('Status');
     } else if (currentPath === '/services') {
       setActivePage('Services');
     } else if (currentPath === '/' || currentPath === '') {
@@ -67,6 +70,10 @@ const Header: React.FC = () => {
       // Navigate to Booking page
       console.log('Navigating to Booking page');
       navigate('/booking');
+    } else if (label === "Status") {
+      // Navigate to Status page
+      console.log('Navigating to Status page');
+      navigate('/status');
     } else {
       // Handle other navigation buttons (About Us, Developer Team)
       toast({
