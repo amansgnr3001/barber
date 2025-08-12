@@ -43,15 +43,56 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
+  console.log('🔐 Authentication check:', {
+    authHeader: authHeader ? 'Present' : 'Missing',
+    token: token ? 'Present' : 'Missing'
+  });
+
   if (!token) {
+    console.log('❌ No token provided');
     return res.status(401).json({ error: 'Access denied. No token provided.' });
   }
 
   try {
     const verified = jwt.verify(token, JWT_SECRET);
     req.user = verified;
+    console.log('✅ Token verified for user:', verified.email || verified.id);
     next();
   } catch (error) {
+    console.log('❌ Token verification failed:', error.message);
+    res.status(400).json({ error: 'Invalid token' });
+  }
+};
+
+// Barber-specific authentication middleware
+const authenticateBarber = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  console.log('🔐 Barber authentication check:', {
+    authHeader: authHeader ? 'Present' : 'Missing',
+    token: token ? 'Present' : 'Missing'
+  });
+
+  if (!token) {
+    console.log('❌ No token provided for barber access');
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  try {
+    const verified = jwt.verify(token, JWT_SECRET);
+
+    // Check if user has barber role
+    if (verified.role !== 'barber') {
+      console.log('❌ Access denied: User is not a barber');
+      return res.status(403).json({ error: 'Access denied. Barber privileges required.' });
+    }
+
+    req.user = verified;
+    console.log('✅ Barber token verified for user:', verified.email || verified.id);
+    next();
+  } catch (error) {
+    console.log('❌ Barber token verification failed:', error.message);
     res.status(400).json({ error: 'Invalid token' });
   }
 };
@@ -324,9 +365,9 @@ app.delete('/api/cancel/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all appointments for barber dashboard (no auth required for now)
+// Get all appointments for barber dashboard (barber authentication required)
 console.log('✅ Registering appointments endpoint: GET /api/appointments/all');
-app.get('/api/appointments/all', async (req, res) => {
+app.get('/api/appointments/all', authenticateBarber, async (req, res) => {
   try {
     console.log('📋 Fetching all appointments from database...');
 
@@ -394,7 +435,7 @@ app.get('/api/appointments/all', async (req, res) => {
 });
 
 // Barber Dashboard - Get all appointments
-app.get('/api/barber/appointments', authenticateToken, async (req, res) => {
+app.get('/api/barber/appointments', authenticateBarber, async (req, res) => {
   try {
     // Get all appointments with populated service details
     const appointments = await Appointment.find({})
@@ -432,7 +473,7 @@ app.get('/api/barber/appointments', authenticateToken, async (req, res) => {
 });
 
 // Barber Dashboard - Get appointment statistics
-app.get('/api/barber/stats', authenticateToken, async (req, res) => {
+app.get('/api/barber/stats', authenticateBarber, async (req, res) => {
   try {
     const today = new Date();
     const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
@@ -473,8 +514,8 @@ app.get('/api/barber/stats', authenticateToken, async (req, res) => {
   }
 });
 
-// Protected Route to retrieve all services
-app.get('/api/services', authenticateToken, async (req, res) => {
+// Protected Route to retrieve all services (barber only)
+app.get('/api/services', authenticateBarber, async (req, res) => {
   try {
     const services = await Services.find({});
     res.json(services);
@@ -484,39 +525,287 @@ app.get('/api/services', authenticateToken, async (req, res) => {
   }
 });
 
+// Protected Route to create a new service (barber only)
+app.post('/api/services', authenticateBarber, async (req, res) => {
+  try {
+    const { name, cost, time, gender } = req.body;
+
+    console.log('➕ POST /api/services - Create service request:', {
+      body: req.body,
+      user: req.user?.email || 'Unknown'
+    });
+
+    // Validate required fields
+    if (!name || !cost || !time || !gender) {
+      console.log('❌ Validation failed: Missing required fields');
+      return res.status(400).json({
+        error: 'All fields are required: name, cost, time, gender'
+      });
+    }
+
+    // Validate gender field
+    if (!['male', 'female'].includes(gender.toLowerCase())) {
+      console.log('❌ Validation failed: Invalid gender');
+      return res.status(400).json({
+        error: 'Invalid gender. Must be "male" or "female"'
+      });
+    }
+
+    // Check if service with same name and gender already exists
+    const existingService = await Services.findOne({
+      name: name.trim(),
+      gender: gender.toLowerCase()
+    });
+
+    if (existingService) {
+      console.log('❌ Service already exists');
+      return res.status(409).json({
+        error: `Service "${name}" for ${gender} already exists`
+      });
+    }
+
+    // Create new service
+    const newService = new Services({
+      name: name.trim(),
+      cost: cost.trim(),
+      time: time.trim(),
+      gender: gender.toLowerCase()
+    });
+
+    const savedService = await newService.save();
+
+    console.log(`✅ New service created: ${savedService.name} (${savedService.gender})`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Service created successfully',
+      service: savedService
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating service:', error);
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        error: 'Validation error',
+        details: error.message
+      });
+    }
+
+    res.status(500).json({ error: 'Error creating service' });
+  }
+});
+
 // Route to retrieve services by gender (no authentication required for booking page)
 app.get('/api/services/:gender', async (req, res) => {
   try {
     const { gender } = req.params;
-    
+
     // Validate gender parameter
     if (!gender || !['male', 'female'].includes(gender.toLowerCase())) {
-      return res.status(400).json({ 
-        error: 'Invalid gender parameter. Must be "male" or "female"' 
+      return res.status(400).json({
+        error: 'Invalid gender parameter. Must be "male" or "female"'
       });
     }
-    
+
     const services = await Services.find({
       gender: gender.toLowerCase()
     });
-    
+
     if (services.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: `No services found for ${gender}`,
         services: []
       });
     }
-    
+
     res.json({
       success: true,
       gender: gender.toLowerCase(),
       count: services.length,
       services: services
     });
-    
+
   } catch (error) {
     console.error('Error retrieving services by gender:', error);
     res.status(500).json({ error: 'Error retrieving services by gender' });
+  }
+});
+
+// Protected Route to update a specific service (barber only)
+app.put('/api/services/:id', authenticateBarber, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, cost, time, gender } = req.body;
+
+    console.log('🔄 PUT /api/services/:id - Update service request:', {
+      id,
+      body: req.body,
+      user: req.user?.email || 'Unknown'
+    });
+
+    // Validate required fields
+    if (!name || !cost || !time || !gender) {
+      console.log('❌ Validation failed: Missing required fields');
+      return res.status(400).json({
+        error: 'All fields are required: name, cost, time, gender'
+      });
+    }
+
+    // Validate gender field
+    if (!['male', 'female'].includes(gender.toLowerCase())) {
+      return res.status(400).json({
+        error: 'Invalid gender. Must be "male" or "female"'
+      });
+    }
+
+    // Check if service exists
+    const existingService = await Services.findById(id);
+    if (!existingService) {
+      return res.status(404).json({
+        error: 'Service not found'
+      });
+    }
+
+    // Update the service
+    const updatedService = await Services.findByIdAndUpdate(
+      id,
+      {
+        name: name.trim(),
+        cost: cost.trim(),
+        time: time.trim(),
+        gender: gender.toLowerCase()
+      },
+      {
+        new: true, // Return the updated document
+        runValidators: true // Run schema validations
+      }
+    );
+
+    console.log(`✅ Service updated: ${updatedService.name} (${updatedService.gender})`);
+
+    res.json({
+      success: true,
+      message: 'Service updated successfully',
+      service: updatedService
+    });
+
+  } catch (error) {
+    console.error('Error updating service:', error);
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        error: 'Validation error',
+        details: error.message
+      });
+    }
+
+    // Handle invalid ObjectId
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        error: 'Invalid service ID format'
+      });
+    }
+
+    res.status(500).json({ error: 'Error updating service' });
+  }
+});
+
+
+
+// Protected Route to delete a service (barber only)
+app.delete('/api/services/:id', authenticateBarber, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if service exists
+    const existingService = await Services.findById(id);
+    if (!existingService) {
+      return res.status(404).json({
+        error: 'Service not found'
+      });
+    }
+
+    // Delete the service
+    await Services.findByIdAndDelete(id);
+
+    console.log(`✅ Service deleted: ${existingService.name} (${existingService.gender})`);
+
+    res.json({
+      success: true,
+      message: 'Service deleted successfully',
+      deletedService: {
+        id: existingService._id,
+        name: existingService.name,
+        gender: existingService.gender
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting service:', error);
+
+    // Handle invalid ObjectId
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        error: 'Invalid service ID format'
+      });
+    }
+
+    res.status(500).json({ error: 'Error deleting service' });
+  }
+});
+
+// Protected Route for barber to cancel appointments (barber only)
+app.delete('/api/barber/cancel/:id', authenticateBarber, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('🗑️ DELETE /api/barber/cancel/:id - Cancel appointment request:', {
+      appointmentId: id,
+      user: req.user?.email || 'Unknown'
+    });
+
+    // Check if appointment exists
+    const existingAppointment = await Appointment.findById(id);
+    if (!existingAppointment) {
+      console.log('❌ Appointment not found');
+      return res.status(404).json({
+        error: 'Appointment not found'
+      });
+    }
+
+    // Update appointment status to cancelled
+    const cancelledAppointment = await Appointment.findByIdAndUpdate(
+      id,
+      {
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        cancelledBy: 'barber'
+      },
+      { new: true }
+    );
+
+    console.log(`✅ Appointment cancelled by barber: ${existingAppointment.customerName} (${existingAppointment.customerPhone})`);
+
+    res.json({
+      success: true,
+      message: 'Appointment cancelled successfully',
+      appointment: cancelledAppointment
+    });
+
+  } catch (error) {
+    console.error('❌ Error cancelling appointment:', error);
+
+    // Handle invalid ObjectId
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        error: 'Invalid appointment ID format'
+      });
+    }
+
+    res.status(500).json({ error: 'Error cancelling appointment' });
   }
 });
 
@@ -570,8 +859,8 @@ app.get('/api/slots1', authenticateToken, async (req, res) => {
   }
 });
 
-// Accept appointment link -> creates an appointment and confirms
-app.get('/api/appointments/accept', async (req, res) => {
+// Accept appointment link -> creates an appointment and confirms (authentication required)
+app.get('/api/appointments/accept', authenticateToken, async (req, res) => {
   try {
     console.log('aman');
     const { day, timeSlot, start, end, name, phone, gender, services } = req.query;
@@ -683,8 +972,8 @@ app.delete('/api/appointments/cancel/:id', authenticateToken, async (req, res) =
   }
 });
 
-// Decline appointment link -> no-op confirmation
-app.get('/api/appointments/decline', (req, res) => {
+// Decline appointment link -> no-op confirmation (authentication required)
+app.get('/api/appointments/decline', authenticateToken, (req, res) => {
   const { name, day, timeSlot } = req.query;
   const message = name && day && timeSlot
     ? `❌ Appointment declined for ${name} on ${day} ${timeSlot}. The time slot has been released and is now available for other bookings.`
@@ -1079,6 +1368,9 @@ app.listen(PORT, () => {
   console.log(`Test the server at: http://localhost:${PORT}/test`);
   console.log(`Services API at: http://localhost:${PORT}/api/services`);
   console.log(`Gender-based services API at: http://localhost:${PORT}/api/services/:gender`);
+  console.log(`✅ POST /api/services route should be available for creating services`);
+  console.log(`✅ PUT /api/services/:id route should be available for updating services`);
+  console.log(`✅ DELETE /api/services/:id route should be available for deleting services`);
 });
 
 export default app;

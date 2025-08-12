@@ -7,6 +7,7 @@ import LandingPage from "./pages/LandingPage";
 import CustomerLogin from "./pages/CustomerLogin";
 import BarberLogin from "./pages/BarberLogin";
 import BarberDashboard from "./pages/BarberDashboard";
+import BarberServices from "./pages/BarberServices";
 import Index from "./pages/Index";
 import Services from "./pages/Services";
 import Booking from "./pages/Booking";
@@ -60,6 +61,11 @@ const App = () => (
           <Route path="/barber/dashboard" element={
             <ProtectedRoute>
               <BarberDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/barber/services" element={
+            <ProtectedRoute>
+              <BarberServices />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

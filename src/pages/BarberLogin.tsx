@@ -28,8 +28,8 @@ const BarberLogin = () => {
     setIsLoading(true);
 
     try {
-      // Temporarily using customer login endpoint until barber endpoint is fixed
-      const response = await fetch('http://localhost:3001/api/login', {
+      // Using proper barber login endpoint
+      const response = await fetch('http://localhost:3001/api/barber/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

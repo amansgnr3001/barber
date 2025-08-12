@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Users, TrendingUp, Phone, User, Scissors, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, Users, TrendingUp, Phone, User, Scissors, RefreshCw, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Appointment {
   _id: string;
@@ -49,6 +50,7 @@ const BarberDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardData();
@@ -264,6 +266,76 @@ const BarberDashboard: React.FC = () => {
     });
   };
 
+  // Format appointment time for better readability
+  const formatAppointmentTime = (startTime: string, endTime: string, timeSlot: string) => {
+    // Helper function to format time from various formats
+    const formatSingleTime = (timeStr: string) => {
+      if (!timeStr || timeStr === 'N/A') return null;
+
+      // If it's already in readable format (e.g., "12:45 PM"), return as is
+      if (timeStr.includes('AM') || timeStr.includes('PM')) {
+        return timeStr;
+      }
+
+      // If it's an ISO timestamp (e.g., "2000-01-01T03:30:00.000Z"), parse it
+      if (timeStr.includes('T') && timeStr.includes('Z')) {
+        try {
+          const date = new Date(timeStr);
+          return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+        } catch (error) {
+          console.warn('Failed to parse timestamp:', timeStr);
+          return null;
+        }
+      }
+
+      // If it's just a time string (e.g., "15:30"), try to parse it
+      if (timeStr.includes(':')) {
+        try {
+          const [hours, minutes] = timeStr.split(':');
+          const date = new Date();
+          date.setHours(parseInt(hours), parseInt(minutes));
+          return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+        } catch (error) {
+          console.warn('Failed to parse time:', timeStr);
+          return null;
+        }
+      }
+
+      return null;
+    };
+
+    // Try to format both start and end times
+    const formattedStart = formatSingleTime(startTime);
+    const formattedEnd = formatSingleTime(endTime);
+
+    // If we have both formatted times, use them
+    if (formattedStart && formattedEnd) {
+      return `${formattedStart} - ${formattedEnd}`;
+    }
+
+    // If we have only one formatted time, show it
+    if (formattedStart) {
+      return formattedStart;
+    }
+
+    // Otherwise, use the time slot with readable format
+    const timeSlotMap: { [key: string]: string } = {
+      'morning': '9:00 AM - 12:00 PM',
+      'afternoon': '12:00 PM - 5:00 PM',
+      'evening': '5:00 PM - 8:00 PM'
+    };
+
+    return timeSlotMap[timeSlot] || timeSlot || 'Time TBD';
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'booked':
@@ -311,23 +383,33 @@ const BarberDashboard: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Barber Dashboard</h1>
               <p className="text-gray-600">Manage your appointments and view business insights</p>
             </div>
-            <Button
-              onClick={handleManualRefresh}
-              disabled={refreshing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => navigate('/barber/services')}
+                variant="default"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Manage Services
+              </Button>
+              <Button
+                onClick={handleManualRefresh}
+                disabled={refreshing}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </div>
           </div>
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex justify-between items-center">
               <p className="text-sm text-green-700">
-                🎉 <strong>Welcome to the Barber Portal!</strong> Showing your REAL database appointments.
-                Latest: ammsdn (666622222221), kuntal (8690383001), dfnd (45633).
-                <span className="ml-2 text-green-600">• Total: 26 appointments</span>
+                🎉 <strong>Welcome to Barber Portal!</strong>
+                <span className="ml-2 text-green-600">• Total: {stats?.totalAppointments || 0} appointments</span>
               </p>
               {lastUpdated && (
                 <p className="text-xs text-green-600">
@@ -451,7 +533,7 @@ const BarberDashboard: React.FC = () => {
                             </span>
                             <span className="flex items-center">
                               <Clock className="h-4 w-4 mr-1" />
-                              {appointment.startTime} - {appointment.endTime}
+                              {formatAppointmentTime(appointment.startTime, appointment.endTime, appointment.timeSlot)}
                             </span>
                           </div>
                         </div>
