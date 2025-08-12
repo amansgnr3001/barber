@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import CustomerLogin from "./pages/CustomerLogin";
 import BarberLogin from "./pages/BarberLogin";
+import BarberDashboard from "./pages/BarberDashboard";
 import Index from "./pages/Index";
 import Services from "./pages/Services";
 import Booking from "./pages/Booking";
@@ -54,6 +55,11 @@ const App = () => (
           <Route path="/status" element={
             <ProtectedRoute>
               <Status />
+            </ProtectedRoute>
+          } />
+          <Route path="/barber/dashboard" element={
+            <ProtectedRoute>
+              <BarberDashboard />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

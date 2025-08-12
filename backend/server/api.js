@@ -11,6 +11,7 @@ import Appointment from '../models/appointments.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Customer from '../models/customers.js';
+import Barber from '../models/barber.js';
 
 // Configure dotenv
 dotenv.config();
@@ -198,6 +199,79 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Barber Login Route
+console.log('✅ Registering barber login route: POST /api/barber/login');
+app.post('/api/barber/login', async (req, res) => {
+  console.log('🔐 Barber login attempt received');
+  console.log('📋 Request body:', req.body);
+
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      console.log('❌ Missing email or password');
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide both email and password'
+      });
+    }
+
+    console.log(`🔍 Looking for barber with email: ${email}`);
+
+    // Check if barber exists
+    const barber = await Barber.findOne({ email });
+    if (!barber) {
+      console.log('❌ Barber not found');
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email or password'
+      });
+    }
+
+    console.log(`✅ Barber found: ${barber.name}`);
+
+    // Validate password
+    const validPassword = await bcrypt.compare(password, barber.password);
+    if (!validPassword) {
+      console.log('❌ Invalid password');
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email or password'
+      });
+    }
+
+    console.log('✅ Password valid, creating token');
+
+    // Create and assign token
+    const token = jwt.sign(
+      { id: barber._id, email: barber.email, role: 'barber' },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    console.log('🎉 Barber login successful');
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: barber._id,
+        name: barber.name,
+        email: barber.email,
+        phone: barber.phonenumber,
+        role: 'barber'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Barber login error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'An error occurred during login'
+    });
+  }
+});
+
 // Cancel appointment route (working version)
 console.log('✅ Registering WORKING cancel route: DELETE /api/cancel/:id');
 app.delete('/api/cancel/:id', authenticateToken, async (req, res) => {
@@ -247,6 +321,155 @@ app.delete('/api/cancel/:id', authenticateToken, async (req, res) => {
       success: false,
       error: 'Failed to cancel appointment'
     });
+  }
+});
+
+// Get all appointments for barber dashboard (no auth required for now)
+console.log('✅ Registering appointments endpoint: GET /api/appointments/all');
+app.get('/api/appointments/all', async (req, res) => {
+  try {
+    console.log('📋 Fetching all appointments from database...');
+
+    // Get all appointments from database
+    const appointments = await Appointment.find({})
+      .sort({ _id: -1 }) // Sort by newest first
+      .lean();
+
+    console.log(`📊 Found ${appointments.length} appointments in database`);
+
+    // Log first few appointments for debugging
+    if (appointments.length > 0) {
+      console.log('📋 Recent appointments:');
+      appointments.slice(0, 3).forEach((apt, index) => {
+        console.log(`  ${index + 1}. ${apt.customerName} - ${apt.status} - ${apt.day}`);
+      });
+    }
+
+    // Categorize appointments by status and time
+    const activeAppointments = appointments.filter(apt =>
+      apt.status === 'booked' || apt.status === 'confirmed'
+    );
+
+    const cancelledAppointments = appointments.filter(apt =>
+      apt.status === 'cancelled'
+    );
+
+    console.log(`✅ Active: ${activeAppointments.length}, Cancelled: ${cancelledAppointments.length}`);
+
+    // For today/upcoming, we'll use day of week since we don't have exact dates
+    const today = new Date();
+    const currentDay = today.toLocaleDateString('en-US', { weekday: 'long' });
+
+    const todayAppointments = activeAppointments.filter(apt =>
+      apt.day === currentDay
+    );
+
+    const upcomingAppointments = activeAppointments.filter(apt =>
+      apt.day !== currentDay
+    );
+
+    res.json({
+      success: true,
+      appointments: activeAppointments, // Return only active appointments
+      categorized: {
+        all: activeAppointments,
+        today: todayAppointments,
+        upcoming: upcomingAppointments,
+        cancelled: cancelledAppointments
+      },
+      stats: {
+        total: activeAppointments.length,
+        cancelled: cancelledAppointments.length,
+        currentDay: currentDay
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching appointments:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch appointments',
+      appointments: []
+    });
+  }
+});
+
+// Barber Dashboard - Get all appointments
+app.get('/api/barber/appointments', authenticateToken, async (req, res) => {
+  try {
+    // Get all appointments with populated service details
+    const appointments = await Appointment.find({})
+      .populate('services', 'name cost time')
+      .sort({ startTime: 1 })
+      .lean();
+
+    // Group appointments by status and day
+    const today = new Date();
+    const todayAppointments = appointments.filter(apt => {
+      const aptDate = new Date(apt.startTime);
+      return aptDate.toDateString() === today.toDateString();
+    });
+
+    const upcomingAppointments = appointments.filter(apt => {
+      const aptDate = new Date(apt.startTime);
+      return aptDate > today;
+    });
+
+    res.json({
+      success: true,
+      total: appointments.length,
+      today: todayAppointments.length,
+      upcoming: upcomingAppointments.length,
+      appointments: {
+        all: appointments,
+        today: todayAppointments,
+        upcoming: upcomingAppointments
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving barber appointments:', error);
+    res.status(500).json({ error: 'Error retrieving appointments' });
+  }
+});
+
+// Barber Dashboard - Get appointment statistics
+app.get('/api/barber/stats', authenticateToken, async (req, res) => {
+  try {
+    const today = new Date();
+    const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+    const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+
+    // Get appointments for this week
+    const weeklyAppointments = await Appointment.find({
+      startTime: {
+        $gte: startOfWeek,
+        $lte: endOfWeek
+      }
+    }).lean();
+
+    // Calculate statistics
+    const stats = {
+      totalAppointments: await Appointment.countDocuments(),
+      weeklyAppointments: weeklyAppointments.length,
+      todayAppointments: weeklyAppointments.filter(apt => {
+        const aptDate = new Date(apt.startTime);
+        return aptDate.toDateString() === new Date().toDateString();
+      }).length,
+      appointmentsByDay: {
+        Monday: weeklyAppointments.filter(apt => apt.day === 'Monday').length,
+        Tuesday: weeklyAppointments.filter(apt => apt.day === 'Tuesday').length,
+        Wednesday: weeklyAppointments.filter(apt => apt.day === 'Wednesday').length,
+        Thursday: weeklyAppointments.filter(apt => apt.day === 'Thursday').length,
+        Friday: weeklyAppointments.filter(apt => apt.day === 'Friday').length,
+      }
+    };
+
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('Error retrieving barber stats:', error);
+    res.status(500).json({ error: 'Error retrieving statistics' });
   }
 });
 

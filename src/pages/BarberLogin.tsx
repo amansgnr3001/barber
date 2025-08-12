@@ -28,8 +28,7 @@ const BarberLogin = () => {
     setIsLoading(true);
 
     try {
-      // Note: You'll need to create a barber login endpoint in your API
-      // For now, using the same login endpoint - you should create /api/barber/login
+      // Temporarily using customer login endpoint until barber endpoint is fixed
       const response = await fetch('http://localhost:3001/api/login', {
         method: 'POST',
         headers: {
@@ -42,16 +41,17 @@ const BarberLogin = () => {
 
       if (response.ok) {
         // Save barber token and data in localStorage
-        localStorage.setItem('barberToken', data.token);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userRole', 'barber');
         localStorage.setItem('barberData', JSON.stringify(data.user));
 
         toast({
           title: "Success",
-          description: "Logged in successfully!",
+          description: "Welcome to Barber Dashboard!",
         });
 
-        // Redirect to home page (you might want to create a barber dashboard)
-        navigate('/home');
+        // Redirect to barber dashboard
+        navigate('/barber/dashboard');
       } else {
         toast({
           title: "Error",
