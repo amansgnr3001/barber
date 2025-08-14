@@ -17,11 +17,33 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 // Protected Route Component for authenticated users
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const token = localStorage.getItem('token') || localStorage.getItem('barberToken');
+const ProtectedRoute = ({
+  children,
+  requiredRole
+}: {
+  children: React.ReactNode,
+  requiredRole?: 'customer' | 'barber'
+}) => {
+  const customerToken = localStorage.getItem('token');
+  const barberToken = localStorage.getItem('barberToken');
   
-  if (!token) {
-    window.location.href = '/';
+  // If no role is specified, any token is acceptable
+  if (!requiredRole) {
+    if (!customerToken && !barberToken) {
+      window.location.href = '/';
+      return null;
+    }
+    return <>{children}</>;
+  }
+  
+  // Check for specific role token
+  if (requiredRole === 'customer' && !customerToken) {
+    window.location.href = '/customer/login';
+    return null;
+  }
+  
+  if (requiredRole === 'barber' && !barberToken) {
+    window.location.href = '/barber/login';
     return null;
   }
   
@@ -39,32 +61,32 @@ const App = () => (
           <Route path="/customer/login" element={<CustomerLogin />} />
           <Route path="/barber/login" element={<BarberLogin />} />
           <Route path="/home" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="customer">
               <Index />
             </ProtectedRoute>
           } />
           <Route path="/services" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="customer">
               <Services />
             </ProtectedRoute>
           } />
           <Route path="/booking" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="customer">
               <Booking />
             </ProtectedRoute>
           } />
           <Route path="/status" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="customer">
               <Status />
             </ProtectedRoute>
           } />
           <Route path="/barber/dashboard" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="barber">
               <BarberDashboard />
             </ProtectedRoute>
           } />
           <Route path="/barber/services" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="barber">
               <BarberServices />
             </ProtectedRoute>
           } />

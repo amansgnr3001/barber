@@ -4,10 +4,19 @@ import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
 import { LogOut, Scissors } from "lucide-react";
 
-const navButtons: { label: string; href: string; variant: "default" | "outline" }[] = [
+// Customer navigation buttons
+const customerNavButtons: { label: string; href: string; variant: "default" | "outline" }[] = [
   { label: "Book Now", href: "/booking", variant: "outline" },
   { label: "Status", href: "/status", variant: "outline" },
   { label: "Services", href: "/services", variant: "outline" },
+  { label: "About Us", href: "#about", variant: "outline" },
+  { label: "Developer Team", href: "#team", variant: "outline" },
+];
+
+// Barber navigation buttons
+const barberNavButtons: { label: string; href: string; variant: "default" | "outline" }[] = [
+  { label: "Dashboard", href: "/barber/dashboard", variant: "outline" },
+  { label: "Services", href: "/barber/services", variant: "outline" },
   { label: "About Us", href: "#about", variant: "outline" },
   { label: "Developer Team", href: "#team", variant: "outline" },
 ];
@@ -17,42 +26,78 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activePage, setActivePage] = useState<string>('');
+  const [isBarber, setIsBarber] = useState<boolean>(false);
 
-  // Update active page based on current route
+  // Check user role on component mount
+  useEffect(() => {
+    const barberToken = localStorage.getItem('barberToken');
+    setIsBarber(!!barberToken);
+  }, []);
+
+  // Update active page based on current route and user role
   useEffect(() => {
     const currentPath = location.pathname;
-    if (currentPath === '/booking') {
-      setActivePage('Book Now');
-    } else if (currentPath === '/status') {
-      setActivePage('Status');
-    } else if (currentPath === '/services') {
-      setActivePage('Services');
-    } else if (currentPath === '/' || currentPath === '') {
-      // Check if we're on homepage and looking at specific sections
-      const hash = location.hash;
-      if (hash === '#about') {
-        setActivePage('About Us');
-      } else if (hash === '#team') {
-        setActivePage('Developer Team');
+    
+    if (isBarber) {
+      // Barber routes
+      if (currentPath === '/barber/dashboard') {
+        setActivePage('Dashboard');
+      } else if (currentPath === '/barber/services') {
+        setActivePage('Services');
+      } else if (currentPath === '/' || currentPath === '') {
+        // Check if we're on homepage and looking at specific sections
+        const hash = location.hash;
+        if (hash === '#about') {
+          setActivePage('About Us');
+        } else if (hash === '#team') {
+          setActivePage('Developer Team');
+        } else {
+          setActivePage(''); // Homepage, no specific section
+        }
       } else {
-        setActivePage(''); // Homepage, no specific section
+        setActivePage('');
       }
     } else {
-      setActivePage('');
+      // Customer routes
+      if (currentPath === '/booking') {
+        setActivePage('Book Now');
+      } else if (currentPath === '/status') {
+        setActivePage('Status');
+      } else if (currentPath === '/services') {
+        setActivePage('Services');
+      } else if (currentPath === '/' || currentPath === '') {
+        // Check if we're on homepage and looking at specific sections
+        const hash = location.hash;
+        if (hash === '#about') {
+          setActivePage('About Us');
+        } else if (hash === '#team') {
+          setActivePage('Developer Team');
+        } else {
+          setActivePage(''); // Homepage, no specific section
+        }
+      } else {
+        setActivePage('');
+      }
     }
-  }, [location]);
+  }, [location, isBarber]);
 
   const handleLogout = () => {
+    // Determine user type before clearing storage
+    const isBarber = !!localStorage.getItem('barberToken');
+    
+    // Clear all auth data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('barberToken');
     localStorage.removeItem('barberData');
+    localStorage.removeItem('userRole');
     
     toast({
       title: "Logged out",
       description: "You have been successfully logged out.",
     });
     
+    // Redirect to appropriate landing page
     navigate('/');
   };
 
@@ -62,24 +107,35 @@ const Header: React.FC = () => {
     // Update active page immediately for better UX
     setActivePage(label);
 
-    if (label === "Services") {
-      // Navigate to Services page
-      console.log('Navigating to Services page');
-      navigate('/services');
-    } else if (label === "Book Now") {
-      // Navigate to Booking page
-      console.log('Navigating to Booking page');
-      navigate('/booking');
-    } else if (label === "Status") {
-      // Navigate to Status page
-      console.log('Navigating to Status page');
-      navigate('/status');
+    // Handle navigation based on button label
+    if (isBarber) {
+      // Barber navigation
+      if (label === "Dashboard") {
+        navigate('/barber/dashboard');
+      } else if (label === "Services") {
+        navigate('/barber/services');
+      } else {
+        // Handle other navigation buttons (About Us, Developer Team)
+        toast({
+          title: "Demo Navigation",
+          description: `This is a demo ${label} button. The section is already visible on the page.`,
+        });
+      }
     } else {
-      // Handle other navigation buttons (About Us, Developer Team)
-      toast({
-        title: "Demo Navigation",
-        description: `This is a demo ${label} button. The section is already visible on the page.`,
-      });
+      // Customer navigation
+      if (label === "Services") {
+        navigate('/services');
+      } else if (label === "Book Now") {
+        navigate('/booking');
+      } else if (label === "Status") {
+        navigate('/status');
+      } else {
+        // Handle other navigation buttons (About Us, Developer Team)
+        toast({
+          title: "Demo Navigation",
+          description: `This is a demo ${label} button. The section is already visible on the page.`,
+        });
+      }
     }
   };
 
@@ -89,7 +145,8 @@ const Header: React.FC = () => {
         <button
           onClick={(e) => {
             e.preventDefault();
-            navigate('/home');
+            // Navigate to appropriate home page based on user role
+            navigate(isBarber ? '/barber/dashboard' : '/home');
           }}
           className="flex items-center gap-2 font-bold text-xl tracking-tight hover:opacity-80 transition-all duration-200"
         >
@@ -101,7 +158,7 @@ const Header: React.FC = () => {
           </span>
         </button>
         <div className="flex flex-wrap items-center gap-3 overflow-x-auto">
-          {navButtons.map((btn) => {
+          {(isBarber ? barberNavButtons : customerNavButtons).map((btn) => {
             const isActive = activePage === btn.label;
             return (
               <Button

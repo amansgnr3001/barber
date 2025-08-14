@@ -40,8 +40,12 @@ const BarberLogin = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Save barber token and data in localStorage
-        localStorage.setItem('token', data.token);
+        // Clear any existing customer tokens to prevent conflicts
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Save barber token and data in localStorage with distinct keys
+        localStorage.setItem('barberToken', data.token);
         localStorage.setItem('userRole', 'barber');
         localStorage.setItem('barberData', JSON.stringify(data.user));
 

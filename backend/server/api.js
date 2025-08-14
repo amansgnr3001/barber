@@ -1569,16 +1569,21 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     console.log(`🔍 Retrieving service details for IDs: ${services.join(', ')}`);
     
     // Retrieve service details and calculate total time
+    let totalTimeMinutes = 0;
+    let serviceDetails = [];
+    
     try {
-      const serviceDetails = await Services.find({ _id: { $in: services } });
+      serviceDetails = await Services.find({ _id: { $in: services } }).lean();
       
       // Check if all requested services were found
       if (serviceDetails.length !== services.length) {
         console.log(`❌ Not all services found. Requested: ${services.length}, Found: ${serviceDetails.length}`);
+        const foundIds = serviceDetails.map(s => s._id.toString());
+        const missingIds = services.filter(id => !foundIds.includes(id.toString()));
         return res.status(404).json({
           success: false,
           error: 'One or more services not found',
-          details: 'Some of the requested services do not exist'
+          details: `Services not found: ${missingIds.join(', ')}`
         });
       }
       
@@ -1596,45 +1601,54 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
         });
       }
       
-      let totalTimeMinutes = 0;
-      
+      // Calculate total time with improved parsing
       serviceDetails.forEach(service => {
-        const timeString = service.time;
+        const timeString = service.time || '';
         let minutes = 0;
         
-        // Try to parse time in format "X minutes" or "X min"
-        const minutesMatch = timeString.match(/(\d+)\s*(min|minutes)/i);
-        if (minutesMatch) {
-          minutes = parseInt(minutesMatch[1]);
-        }
-        // Try to parse time in format "X hours Y minutes" or "X hr Y min"
-        else {
-          const hoursMatch = timeString.match(/(\d+)\s*(hr|hour|hours)/i);
-          const minsMatch = timeString.match(/(\d+)\s*(min|minutes)/i);
+        try {
+          // Convert to lowercase for consistent matching
+          const timeStr = timeString.toLowerCase().trim();
           
-          if (hoursMatch) {
-            minutes += parseInt(hoursMatch[1]) * 60;
-          }
-          
-          if (minsMatch) {
-            minutes += parseInt(minsMatch[1]);
-          }
-        }
-        
-        // If no valid time format was found, try to just extract any number
-        if (minutes === 0) {
-          const anyNumber = timeString.match(/(\d+)/);
-          if (anyNumber) {
-            minutes = parseInt(anyNumber[1]);
+          // Try to parse time in various formats
+          if (timeStr.includes('hour') || timeStr.includes('hr')) {
+            // Handle hours and minutes combination
+            const hourMatch = timeStr.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)/);
+            const minMatch = timeStr.match(/(\d+)\s*(?:minutes?|mins?)/);
+            
+            if (hourMatch) {
+              minutes += parseFloat(hourMatch[1]) * 60;
+            }
+            if (minMatch) {
+              minutes += parseInt(minMatch[1]);
+            }
+          } else if (timeStr.includes('min')) {
+            // Handle minutes only
+            const minMatch = timeStr.match(/(\d+)\s*(?:minutes?|mins?)/);
+            if (minMatch) {
+              minutes = parseInt(minMatch[1]);
+            }
           } else {
-            // Default to 30 minutes if no number can be extracted
+            // Try to extract any number as minutes
+            const numberMatch = timeStr.match(/(\d+)/);
+            if (numberMatch) {
+              minutes = parseInt(numberMatch[1]);
+            }
+          }
+          
+          // Fallback to 30 minutes if parsing failed
+          if (minutes === 0 || isNaN(minutes)) {
             console.log(`⚠️ Warning: Could not parse time format for service ${service.name}: "${timeString}". Using default of 30 minutes.`);
             minutes = 30;
           }
+          
+          console.log(`✅ Parsed time for service ${service.name}: ${minutes} minutes from "${timeString}"`);
+          totalTimeMinutes += minutes;
+          
+        } catch (parseError) {
+          console.log(`⚠️ Error parsing time for service ${service.name}: ${parseError.message}. Using default of 30 minutes.`);
+          totalTimeMinutes += 30;
         }
-        
-        console.log(`✅ Parsed time for service ${service.name}: ${minutes} minutes from "${timeString}"`);
-        totalTimeMinutes += minutes;
       });
       
       console.log(`✅ Total service time calculated: ${totalTimeMinutes} minutes`);
@@ -1651,13 +1665,6 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     // Determine which schema to use based on gender
     const SlotsSchema = slotUtils.getSlotsModel(gender);
     
-    // Time limits for each slot
-    const timeConstraints = {
-      morning: { hour: 12, minute: 0 }, // 12:00 PM
-      afternoon: { hour: 13, minute: 30 }, // 1:30 PM
-      evening: { hour: 18, minute: 0 } // 6:00 PM
-    };
-    
     // Check if the requested service duration can fit within the slot window considering existing appointments
     const checkSlotAvailability = async (day, timeSlot, slots, totalTimeMinutes) => {
       console.log(`\n🔍 ===== CHECKING SLOT AVAILABILITY =====`);
@@ -1665,89 +1672,89 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
       console.log(`⏰ Time slot: ${timeSlot}`);
       console.log(`⏱️ Total time needed: ${totalTimeMinutes} minutes`);
       
-      // Validate slot array
-      if (!Array.isArray(slots)) {
-        console.log(`❌ Slots is not an array: ${typeof slots}`);
-        return { available: false, reason: 'no_slots', details: 'Slots is not an array' };
-      }
-      
-      if (slots.length === 0) {
-        console.log(`❌ Slots array is empty for ${day} ${timeSlot}`);
-        return { available: false, reason: 'no_slots', details: 'Slots array is empty' };
-      }
-
-      console.log(`📋 Slots array: ${JSON.stringify(slots)}`);
-
-      // Check the first slot in the array
-      const slot = slots[0];
-      
-      if (!slot) {
-        console.log(`❌ First slot is undefined or null`);
-        return { available: false, reason: 'invalid_slot', details: 'First slot is undefined or null' };
-      }
-      
-      if (!slot.name) {
-        console.log(`❌ Slot name is missing: ${JSON.stringify(slot)}`);
-        return { available: false, reason: 'invalid_slot', details: 'Slot name is missing' };
-      }
-      
-      if (slot.name !== "Available") {
-        console.log(`❌ Slot for ${day} ${timeSlot} is not available. Name: "${slot.name}"`);
-        return { available: false, reason: 'slot_unavailable', details: `Slot name is "${slot.name}" instead of "Available"` };
-      }
-
-      // Validate starting_time and ending_time
-      if (!slot.starting_time || !slot.ending_time) {
-        console.log(`❌ Slot time information is missing: ${JSON.stringify(slot)}`);
-        return {
-          available: false,
-          reason: 'invalid_slot_time',
-          details: 'Slot starting_time or ending_time is missing'
-        };
-      }
-      
-      let windowStart, windowEnd;
-      
       try {
-        windowStart = new Date(slot.starting_time);
-        windowEnd = new Date(slot.ending_time);
+        // Validate slot array
+        if (!Array.isArray(slots)) {
+          console.log(`❌ Slots is not an array: ${typeof slots}`);
+          return { available: false, reason: 'no_slots', details: 'Slots is not an array' };
+        }
         
-        if (isNaN(windowStart.getTime()) || isNaN(windowEnd.getTime())) {
-          console.log(`❌ Invalid date format for slot times: Start=${slot.starting_time}, End=${slot.ending_time}`);
+        if (slots.length === 0) {
+          console.log(`❌ Slots array is empty for ${day} ${timeSlot}`);
+          return { available: false, reason: 'no_slots', details: 'Slots array is empty' };
+        }
+
+        console.log(`📋 Slots array length: ${slots.length}`);
+
+        // Check the first slot in the array
+        const slot = slots[0];
+        
+        if (!slot || typeof slot !== 'object') {
+          console.log(`❌ First slot is invalid: ${JSON.stringify(slot)}`);
+          return { available: false, reason: 'invalid_slot', details: 'First slot is invalid' };
+        }
+        
+        if (!slot.name || typeof slot.name !== 'string') {
+          console.log(`❌ Slot name is missing or invalid: ${JSON.stringify(slot)}`);
+          return { available: false, reason: 'invalid_slot', details: 'Slot name is missing or invalid' };
+        }
+        
+        if (slot.name !== "Available") {
+          console.log(`❌ Slot for ${day} ${timeSlot} is not available. Name: "${slot.name}"`);
+          return { available: false, reason: 'slot_unavailable', details: `Slot name is "${slot.name}" instead of "Available"` };
+        }
+
+        // Validate starting_time and ending_time
+        if (!slot.starting_time || !slot.ending_time) {
+          console.log(`❌ Slot time information is missing: ${JSON.stringify(slot)}`);
           return {
             available: false,
             reason: 'invalid_slot_time',
-            details: 'Invalid date format for slot times'
+            details: 'Slot starting_time or ending_time is missing'
           };
         }
         
-        console.log(`📊 Slot window: ${windowStart.toLocaleTimeString()} - ${windowEnd.toLocaleTimeString()}`);
-      } catch (dateError) {
-        console.error(`❌ Error parsing slot dates:`, dateError);
-        return {
-          available: false,
-          reason: 'date_parsing_error',
-          details: dateError.message
-        };
-      }
+        let windowStart, windowEnd;
+        
+        try {
+          windowStart = new Date(slot.starting_time);
+          windowEnd = new Date(slot.ending_time);
+          
+          if (isNaN(windowStart.getTime()) || isNaN(windowEnd.getTime())) {
+            console.log(`❌ Invalid date format for slot times: Start=${slot.starting_time}, End=${slot.ending_time}`);
+            return {
+              available: false,
+              reason: 'invalid_slot_time',
+              details: 'Invalid date format for slot times'
+            };
+          }
+          
+          console.log(`📊 Slot window: ${windowStart.toLocaleTimeString()} - ${windowEnd.toLocaleTimeString()}`);
+        } catch (dateError) {
+          console.error(`❌ Error parsing slot dates:`, dateError);
+          return {
+            available: false,
+            reason: 'date_parsing_error',
+            details: dateError.message
+          };
+        }
 
-      // Check if service duration exceeds slot capacity
-      const slotDurationMinutes = (windowEnd - windowStart) / (1000 * 60);
-      console.log(`📊 Slot duration: ${slotDurationMinutes} minutes`);
-      console.log(`📊 Service duration: ${totalTimeMinutes} minutes`);
-      
-      if (totalTimeMinutes > slotDurationMinutes) {
-        console.log(`❌ Service duration (${totalTimeMinutes}min) exceeds slot capacity (${slotDurationMinutes}min)`);
-        return {
-          available: false,
-          reason: 'duration_exceeds_capacity',
-          slotDuration: slotDurationMinutes,
-          serviceDuration: totalTimeMinutes,
-          details: `Service requires ${totalTimeMinutes} minutes but slot only has ${slotDurationMinutes} minutes available`
-        };
-      }
+        // Check if service duration exceeds slot capacity
+        const slotDurationMinutes = Math.floor((windowEnd - windowStart) / (1000 * 60));
+        console.log(`📊 Slot duration: ${slotDurationMinutes} minutes`);
+        console.log(`📊 Service duration: ${totalTimeMinutes} minutes`);
+        
+        if (totalTimeMinutes > slotDurationMinutes) {
+          console.log(`❌ Service duration (${totalTimeMinutes}min) exceeds slot capacity (${slotDurationMinutes}min)`);
+          return {
+            available: false,
+            reason: 'duration_exceeds_capacity',
+            slotDuration: slotDurationMinutes,
+            serviceDuration: totalTimeMinutes,
+            details: `Service requires ${totalTimeMinutes} minutes but slot only has ${slotDurationMinutes} minutes available`
+          };
+        }
 
-      try {
         // Fetch existing appointments for the same day and time slot
         const existing = await Appointment.find({
           day,
@@ -1758,11 +1765,18 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
         console.log(`📋 Found ${existing.length} existing appointments for ${day} ${timeSlot}`);
 
         // Build a list of blocked intervals
-        const blocked = existing.map(a => ({
-          start: new Date(a.startTime),
-          end: new Date(a.endTime),
-          id: a._id
-        }));
+        const blocked = existing.map(a => {
+          try {
+            return {
+              start: new Date(a.startTime),
+              end: new Date(a.endTime),
+              id: a._id
+            };
+          } catch (err) {
+            console.log(`⚠️ Warning: Invalid appointment time format for ${a._id}`);
+            return null;
+          }
+        }).filter(b => b !== null);
 
         // Try to place the new appointment at the earliest available time in the window
         const durationMs = totalTimeMinutes * 60 * 1000;
@@ -1821,6 +1835,7 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
           available: false,
           reason: 'no_availability'
         };
+        
       } catch (error) {
         console.error(`❌ Error checking slot availability:`, error);
         return {
@@ -1841,8 +1856,20 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
         
         const base = `${req.protocol}://${req.get('host')}`;
         
-        // Format services for URL
-        const servicesParam = Array.isArray(services) ? services.join(',') : '';
+        // Format services for URL - ensure it's a string
+        const servicesParam = Array.isArray(services) ? services.join(',') : String(services || '');
+        
+        // Build query parameters safely
+        const queryParams = new URLSearchParams({
+          day: day,
+          timeSlot: timeSlot,
+          start: startTime.toISOString(),
+          end: endTime.toISOString(),
+          name: fullName,
+          phone: phoneNumber,
+          gender: gender,
+          services: servicesParam
+        });
         
         // Create response with detailed information
         const response = {
@@ -1857,11 +1884,16 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
             customerName: fullName,
             customerPhone: phoneNumber,
             gender: gender,
-            services: services
+            services: services,
+            serviceDetails: serviceDetails.map(s => ({ id: s._id, name: s.name, time: s.time, cost: s.cost }))
           },
           links: {
-            accept: `${base}/api/appointments/accept?day=${encodeURIComponent(day)}&timeSlot=${encodeURIComponent(timeSlot)}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&name=${encodeURIComponent(fullName)}&phone=${encodeURIComponent(phoneNumber)}&gender=${encodeURIComponent(gender)}&services=${encodeURIComponent(servicesParam)}`,
-            decline: `${base}/api/appointments/decline?name=${encodeURIComponent(fullName)}&day=${encodeURIComponent(day)}&timeSlot=${encodeURIComponent(timeSlot)}`
+            accept: `${base}/api/appointments/accept?${queryParams.toString()}`,
+            decline: `${base}/api/appointments/decline?${new URLSearchParams({
+              name: fullName,
+              day: day,
+              timeSlot: timeSlot
+            }).toString()}`
           }
         };
         
@@ -1878,12 +1910,15 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     
     // Case 1: Specific day and specific slot
     if (preferredDay !== 'Anyday' && preferredTime !== 'anytime') {
-      const daySlot = await SlotsSchema.findOne({ day: preferredDay });
+      console.log(`🎯 Case 1: Specific day (${preferredDay}) and specific slot (${preferredTime})`);
+      
+      const daySlot = await SlotsSchema.findOne({ day: preferredDay }).lean();
       
       if (!daySlot) {
+        console.log(`❌ No day slot found for ${preferredDay}`);
         return res.json({ 
           success: false,
-          message: 'No slots available for the preferred day' 
+          message: `No slots available for the preferred day: ${preferredDay}` 
         });
       }
       
@@ -1933,10 +1968,14 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     
     // Case 2: Any day but specific slot
     else if (preferredDay === 'Anyday' && preferredTime !== 'anytime') {
+      console.log(`🎯 Case 2: Any day and specific slot (${preferredTime})`);
+      
       const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
       
       for (const day of weekDays) {
-        const daySlot = await SlotsSchema.findOne({ day: day });
+        console.log(`🔍 Checking ${day} ${preferredTime}...`);
+        
+        const daySlot = await SlotsSchema.findOne({ day: day }).lean();
         
         if (daySlot) {
           const slots = daySlot[preferredTime];
@@ -1952,6 +1991,8 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
           } else {
             console.log(`⚠️ ${day} ${preferredTime}: Not available - ${result.reason}`);
           }
+        } else {
+          console.log(`⚠️ No day slot found for ${day}`);
         }
       }
       
@@ -1963,14 +2004,20 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     
     // Case 3: Any day and any time
     else if (preferredDay === 'Anyday' && preferredTime === 'anytime') {
+      console.log(`🎯 Case 3: Any day and any time`);
+      
       const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
       const timeSlots = ['morning', 'afternoon', 'evening'];
       
       for (const day of weekDays) {
-        const daySlot = await SlotsSchema.findOne({ day: day });
+        console.log(`🔍 Checking ${day}...`);
+        
+        const daySlot = await SlotsSchema.findOne({ day: day }).lean();
         
         if (daySlot) {
           for (const timeSlot of timeSlots) {
+            console.log(`🔍 Checking ${day} ${timeSlot}...`);
+            
             const slots = daySlot[timeSlot];
             
             const result = await checkSlotAvailability(day, timeSlot, slots, totalTimeMinutes);
@@ -1981,6 +2028,8 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
             // Log the reason for unavailability
             console.log(`⚠️ ${day} ${timeSlot}: Not available - ${result.reason}`);
           }
+        } else {
+          console.log(`⚠️ No day slot found for ${day}`);
         }
       }
       
@@ -1992,9 +2041,12 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     
     // Case 4: Specific day but any time
     else if (preferredDay !== 'Anyday' && preferredTime === 'anytime') {
-      const daySlot = await SlotsSchema.findOne({ day: preferredDay });
+      console.log(`🎯 Case 4: Specific day (${preferredDay}) and any time`);
+      
+      const daySlot = await SlotsSchema.findOne({ day: preferredDay }).lean();
       
       if (!daySlot) {
+        console.log(`❌ No day slot found for ${preferredDay}`);
         return res.json({ 
           success: false,
           message: `No slots available for ${preferredDay}` 
@@ -2004,6 +2056,8 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
       const timeSlots = ['morning', 'afternoon', 'evening'];
       
       for (const timeSlot of timeSlots) {
+        console.log(`🔍 Checking ${preferredDay} ${timeSlot}...`);
+        
         const slots = daySlot[timeSlot];
         
         const result = await checkSlotAvailability(preferredDay, timeSlot, slots, totalTimeMinutes);
@@ -2018,6 +2072,16 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
       return res.json({ 
         success: false,
         message: `No slots available for ${preferredDay}` 
+      });
+    }
+    
+    // Fallback case
+    else {
+      console.log(`❌ Invalid preferences: day=${preferredDay}, time=${preferredTime}`);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid preferences',
+        details: 'Invalid preferredDay or preferredTime values'
       });
     }
     
@@ -2038,23 +2102,28 @@ app.post('/api/book-appointment', authenticateToken, async (req, res) => {
     } else if (error.name === 'ReferenceError') {
       errorMessage = 'Reference error in booking process';
       errorDetails = error.message;
-    } else if (error.message.includes('time')) {
+    } else if (error.message && error.message.includes('time')) {
       errorMessage = 'Error processing service time';
       errorDetails = error.message;
+    } else if (error.name === 'MongoError' || error.name === 'MongooseError') {
+      errorMessage = 'Database error';
+      errorDetails = 'Database connection or query failed';
     }
     
     res.status(500).json({
       success: false,
       error: errorMessage,
-      details: process.env.NODE_ENV === 'development' || true ? errorDetails : 'Please try again later'
+      details: process.env.NODE_ENV === 'development' ? errorDetails : 'Please try again later'
     });
   }
 });
+    
+   
 
 // Function to check and reset slots (automated version)
 const checkAndResetSlots = async () => {
   console.log(`\n🔄 ===== AUTOMATED SLOT RESET CHECK =====`);
-  console.log(`⏰ Timestamp: ${new Date().toLocaleString()}`);
+  console.log(`⏰ timestamp: ${new Date().toLocaleString()}`);
   
   try {
     const today = new Date();

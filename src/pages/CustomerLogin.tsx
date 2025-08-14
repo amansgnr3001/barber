@@ -39,9 +39,15 @@ const CustomerLogin = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Save token and user data in localStorage
+        // Clear any existing tokens to prevent conflicts
+        localStorage.removeItem('barberToken');
+        localStorage.removeItem('barberData');
+        localStorage.removeItem('userRole');
+        
+        // Save customer token and user data in localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('userRole', 'customer');
 
         toast({
           title: "Success",

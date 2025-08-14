@@ -10,6 +10,7 @@ import { Loader2, X, Plus } from "lucide-react";
 import Header from "@/components/layout/Header";
 // Using direct fetch for this page per rollback
 import SEO from "@/components/seo/SEO";
+import { acceptAppointment, declineAppointment } from "@/utils/appointmentTracker";
 
 // Services are loaded from backend by selected gender
 
@@ -210,21 +211,10 @@ export default function Booking() {
 
     setIsProcessingAction(true);
     try {
-      const response = await fetch(bookingResponse.links.accept);
-      const data = await response.json();
+      // Use the utility function to handle the accept action with authentication
+      const result = await acceptAppointment(bookingResponse.links.accept, bookingResponse);
 
-      // Store response in localStorage for Status page
-      const responseData = {
-        action: "ACCEPT",
-        timestamp: new Date().toISOString(),
-        response: data,
-        originalBooking: bookingResponse,
-        httpStatus: response.status
-      };
-
-      localStorage.setItem('lastAppointmentResponse', JSON.stringify(responseData));
-
-      if (data.success) {
+      if (result.success) {
         toast({
           title: "✅ Appointment Confirmed!",
           description: "Your appointment has been successfully booked. Check the Status page for details.",
@@ -232,28 +222,13 @@ export default function Booking() {
       } else {
         toast({
           title: "❌ Booking Failed",
-          description: data.error || data.message || "Failed to confirm appointment.",
+          description: result.response?.error || result.response?.message || "Failed to confirm appointment.",
           variant: "destructive",
         });
       }
       setShowModal(false);
       setBookingResponse(null);
-
     } catch (error: any) {
-      // Store error response in localStorage
-      const errorData = {
-        action: "ACCEPT",
-        timestamp: new Date().toISOString(),
-        error: true,
-        response: {
-          success: false,
-          error: error.message || "Failed to process appointment confirmation"
-        },
-        originalBooking: bookingResponse
-      };
-
-      localStorage.setItem('lastAppointmentResponse', JSON.stringify(errorData));
-
       toast({
         title: "❌ Error",
         description: error.message || "Failed to process appointment confirmation.",
@@ -270,21 +245,10 @@ export default function Booking() {
 
     setIsProcessingAction(true);
     try {
-      const response = await fetch(bookingResponse.links.decline);
-      const data = await response.json();
+      // Use the utility function to handle the decline action with authentication
+      const result = await declineAppointment(bookingResponse.links.decline, bookingResponse);
 
-      // Store response in localStorage for Status page
-      const responseData = {
-        action: "DECLINE",
-        timestamp: new Date().toISOString(),
-        response: data,
-        originalBooking: bookingResponse,
-        httpStatus: response.status
-      };
-
-      localStorage.setItem('lastAppointmentResponse', JSON.stringify(responseData));
-
-      if (data.success) {
+      if (result.success) {
         toast({
           title: "❌ Appointment Declined",
           description: "The appointment slot has been released. Check Status page for details.",
@@ -293,28 +257,13 @@ export default function Booking() {
       } else {
         toast({
           title: "❌ Error",
-          description: data.error || data.message || "Failed to decline appointment.",
+          description: result.response?.error || result.response?.message || "Failed to decline appointment.",
           variant: "destructive",
         });
       }
       setShowModal(false);
       setBookingResponse(null);
-
     } catch (error: any) {
-      // Store error response in localStorage
-      const errorData = {
-        action: "DECLINE",
-        timestamp: new Date().toISOString(),
-        error: true,
-        response: {
-          success: false,
-          error: error.message || "Failed to process appointment decline"
-        },
-        originalBooking: bookingResponse
-      };
-
-      localStorage.setItem('lastAppointmentResponse', JSON.stringify(errorData));
-
       toast({
         title: "❌ Error",
         description: error.message || "Failed to process appointment decline.",
