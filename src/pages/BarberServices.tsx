@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
+import { fetchAuthenticatedServices } from "@/utils/appointmentTracker";
 
 interface Service {
   _id: string;
@@ -57,25 +58,18 @@ const BarberServices: React.FC = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const token = localStorage.getItem('token');
-        console.log('🔍 Fetching services with token:', token ? 'Present' : 'Missing');
-
-        const response = await fetch('http://localhost:3001/api/services', {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
-
-        console.log('📡 Services fetch response:', response.status, response.ok);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('❌ Services fetch failed:', errorData);
-          throw new Error(`Failed to fetch services: ${response.status} - ${errorData.error || 'Unknown error'}`);
+        setIsLoading(true);
+        console.log('🔍 Fetching services using authenticated utility...');
+        
+        const result = await fetchAuthenticatedServices();
+        
+        if (result.success) {
+          console.log('✅ Services fetched successfully:', result.services.length, 'services');
+          setServices(result.services);
+          setFilteredServices(result.services);
+        } else {
+          throw new Error(result.error || 'Failed to fetch services');
         }
-
-        const data = await response.json();
-        console.log('✅ Services fetched successfully:', data.length, 'services');
-        setServices(data);
-        setFilteredServices(data);
       } catch (error) {
         console.error('Error fetching services:', error);
         toast({
@@ -137,7 +131,7 @@ const BarberServices: React.FC = () => {
 
       setIsAdding(true);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('barberToken');
       console.log('🔍 Adding service with token:', token ? 'Present' : 'Missing');
       console.log('📝 Service data:', newService);
 
@@ -231,7 +225,7 @@ const BarberServices: React.FC = () => {
 
       setIsEditing(true);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('barberToken');
       console.log('🔍 Updating service with token:', token ? 'Present' : 'Missing');
       console.log('✏️ Service ID:', editingServiceId);
       console.log('📝 Service data:', editService);
@@ -305,7 +299,7 @@ const BarberServices: React.FC = () => {
     try {
       setDeletingServiceId(serviceToDelete.id);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('barberToken');
       console.log('🔍 Deleting service with token:', token ? 'Present' : 'Missing');
       console.log('🗑️ Service to delete:', serviceToDelete);
 
@@ -354,7 +348,7 @@ const BarberServices: React.FC = () => {
 
   // Handle logout
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('barberToken');
     localStorage.removeItem('userRole');
     localStorage.removeItem('barberData');
 

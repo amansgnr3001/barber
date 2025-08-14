@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Calendar, Clock, User, Phone, AlertCircle, CheckCircle } from "lucide-react";
 import Header from "@/components/layout/Header";
 import SEO from "@/components/seo/SEO";
+import { cancelAppointment } from "@/utils/appointmentTracker";
 
 interface ResponseData {
   action: string;
@@ -92,70 +93,27 @@ export default function Status() {
     setIsCancelling(true);
 
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast({
-          title: "❌ Authentication Error",
-          description: "Please log in again to cancel appointment.",
-          variant: "destructive",
-        });
-        setIsCancelling(false);
-        return;
-      }
+      // Use the utility function to cancel the appointment
+      console.log(`🌐 Using cancelAppointment utility function...`);
+      const result = await cancelAppointment(appointmentId);
+      console.log('📡 Cancel result:', result);
 
-      console.log(`🌐 Making API request to cancel appointment...`);
-      console.log(`📡 URL: http://localhost:3001/api/appointments/cancel/${appointmentId}`);
-      console.log(`🔑 Token present: ${!!token}`);
-      console.log(`📤 Request method: DELETE`);
-
-      const response = await fetch(`http://localhost:3001/api/appointments/cancel/${appointmentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log(`📥 API Response received:`);
-      console.log(`   - Status: ${response.status}`);
-      console.log(`   - Status Text: ${response.statusText}`);
-      console.log(`   - OK: ${response.ok}`);
-
-      let data;
-      try {
-        data = await response.json();
-        console.log('📋 Cancel API response:', data);
-      } catch (jsonError) {
-        console.error('❌ Failed to parse JSON response:', jsonError);
-        const textResponse = await response.text();
-        console.log('📋 Raw response:', textResponse);
-
-        toast({
-          title: "❌ Server Error",
-          description: `Server returned invalid response. Status: ${response.status}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (response.ok && data.success) {
+      if (result.success) {
         toast({
           title: "✅ Appointment Cancelled",
-          description: data.message || "Your appointment has been successfully cancelled.",
+          description: result.response?.message || "Your appointment has been successfully cancelled.",
         });
 
         // Clear the stored response data since appointment is cancelled
         localStorage.removeItem('lastAppointmentResponse');
         setResponseData(null);
-
       } else {
         toast({
           title: "❌ Cancellation Failed",
-          description: data.error || data.message || "Failed to cancel appointment. Please try again.",
+          description: result.error || result.response?.error || "Failed to cancel appointment. Please try again.",
           variant: "destructive",
         });
       }
-
     } catch (error: any) {
       console.error('❌ Error cancelling appointment:', error);
       toast({

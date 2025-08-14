@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, Users, TrendingUp, Phone, User, Scissors, RefreshCw, Settings, LogOut, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { cancelAppointment } from '@/utils/appointmentTracker';
 
 interface Appointment {
   _id: string;
@@ -67,7 +68,7 @@ const BarberDashboard: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('barberToken');
       if (!token) {
         toast({
           title: "Authentication Error",
@@ -260,7 +261,7 @@ const BarberDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('barberToken');
     localStorage.removeItem('userRole');
     localStorage.removeItem('barberData');
 
@@ -277,12 +278,9 @@ const BarberDashboard: React.FC = () => {
       const confirmCancel = confirm(`Are you sure you want to cancel the appointment for ${customerName}?`);
       if (!confirmCancel) return;
 
-      const token = localStorage.getItem('token');
       console.log('🔍 Cancelling appointment:', {
         appointmentId,
-        customerName,
-        token: token ? 'Present' : 'Missing',
-        url: `http://localhost:3001/api/barber/cancel/${appointmentId}`
+        customerName
       });
 
       // Log current appointments to verify the ID exists
@@ -292,27 +290,11 @@ const BarberDashboard: React.FC = () => {
         status: apt.status
       })));
 
-      // Try the working cancel route first as fallback
-      const response = await fetch(`http://localhost:3001/api/cancel/${appointmentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Use the utility function to cancel the appointment
+      const result = await cancelAppointment(appointmentId);
+      console.log('📡 Cancel result:', result);
 
-      console.log('📡 Cancel response:', response.status, response.ok);
-
-      let data;
-      try {
-        data = await response.json();
-        console.log('📡 Cancel data:', data);
-      } catch (jsonError) {
-        console.error('❌ Failed to parse JSON response:', jsonError);
-        throw new Error('Invalid response from server');
-      }
-
-      if (response.ok) {
+      if (result.success) {
         toast({
           title: "Success",
           description: "Appointment cancelled successfully!",
@@ -321,7 +303,8 @@ const BarberDashboard: React.FC = () => {
         // Refresh the dashboard data
         await fetchDashboardData();
       } else {
-        throw new Error(data.error || 'Failed to cancel appointment');
+        // Handle error from the utility function
+        throw new Error(result.error || result.response?.error || 'Failed to cancel appointment');
       }
 
     } catch (error) {
