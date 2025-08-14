@@ -26,21 +26,39 @@ const Services = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        console.log('Fetching services from:', 'http://localhost:3001/api/services');
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:3001/api/services', {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
+        setIsLoading(true);
         
-        if (!response.ok) {
-          throw new Error(`Failed to fetch services: ${response.status}`);
+        // Fetch both male and female services using the unprotected endpoints
+        console.log('Fetching male services from:', 'http://localhost:3001/api/services/male');
+        const maleResponse = await fetch('http://localhost:3001/api/services/male');
+        
+        console.log('Fetching female services from:', 'http://localhost:3001/api/services/female');
+        const femaleResponse = await fetch('http://localhost:3001/api/services/female');
+        
+        if (!maleResponse.ok && !femaleResponse.ok) {
+          throw new Error(`Failed to fetch services`);
         }
-        const data = await response.json();
-        console.log('Services data received:', data);
-        setServices(data);
-        setFilteredServices(data);
+        
+        // Process responses
+        let allServices: Service[] = [];
+        
+        if (maleResponse.ok) {
+          const maleData = await maleResponse.json();
+          if (maleData.success && Array.isArray(maleData.services)) {
+            allServices = [...allServices, ...maleData.services];
+          }
+        }
+        
+        if (femaleResponse.ok) {
+          const femaleData = await femaleResponse.json();
+          if (femaleData.success && Array.isArray(femaleData.services)) {
+            allServices = [...allServices, ...femaleData.services];
+          }
+        }
+        
+        console.log('Services data received:', allServices);
+        setServices(allServices);
+        setFilteredServices(allServices);
       } catch (error) {
         console.error('Error fetching services:', error);
         toast({

@@ -9,7 +9,9 @@ const appointmentSchema = new mongoose.Schema({
   startTime: { type: Date, required: true },
   endTime: { type: Date, required: true },
   services: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Services' }],
-  status: { type: String, required: true, enum: ['booked'], default: 'booked' },
+  status: { type: String, required: true, enum: ['booked', 'confirmed', 'cancelled'], default: 'booked' },
+  cancelledAt: { type: Date },
+  cancelledBy: { type: String, enum: ['customer', 'barber'] },
 }, { timestamps: true });
 
 export default mongoose.model('Appointment', appointmentSchema);

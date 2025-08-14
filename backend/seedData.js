@@ -135,6 +135,16 @@ const createDummyCustomers = async () => {
   
   return [
     {
+      name: "Test User",
+      enrollment_number: "EN000",
+      course: "Test Course",
+      year: "2024",
+      email: "test@example.com",
+      gender: "Male",
+      phone_number: "+1-555-0000",
+      password: hashedPassword
+    },
+    {
       name: "Alex Thompson",
       enrollment_number: "EN001",
       course: "Computer Science",

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Scissors, Sparkles, Brush, Clock, Loader2, ArrowLeft, Plus, Edit, Trash2, X, AlertTriangle } from "lucide-react";
+import { Scissors, Sparkles, Brush, Clock, Loader2, ArrowLeft, Plus, Edit, Trash2, X, AlertTriangle, LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -352,6 +352,20 @@ const BarberServices: React.FC = () => {
     setServiceToDelete(null);
   };
 
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('barberData');
+
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out.",
+    });
+
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -372,13 +386,24 @@ const BarberServices: React.FC = () => {
                 <p className="text-gray-600">Manage your barber shop services</p>
               </div>
             </div>
-            <Button
-              className="flex items-center gap-2"
-              onClick={() => setShowAddForm(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add New Service
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                className="flex items-center gap-2"
+                onClick={() => setShowAddForm(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Add New Service
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </div>

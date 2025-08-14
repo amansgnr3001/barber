@@ -147,7 +147,14 @@ export default function Booking() {
 
     try {
       const token = localStorage.getItem('token');
+      console.log('🔍 Booking attempt - Token check:', {
+        tokenExists: !!token,
+        tokenLength: token?.length || 0,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'No token'
+      });
+
       if (!token) {
+        console.log('❌ No token found in localStorage');
         toast({ title: 'Not logged in', description: 'Please log in to book an appointment.', variant: 'destructive' });
         return;
       }
@@ -347,77 +354,94 @@ export default function Booking() {
   // removed getTimeBounds (no longer used)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-black to-gray-900 text-white">
       <SEO
         title="Book Appointment | Barber Suite"
         description="Book your appointment with our professional barbers."
       />
       <Header />
-      <main className="container py-16">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
+      <main className="container py-16 relative">
+        {/* Decorative elements */}
+        <div className="absolute inset-0 bg-[url('/images/barber-pattern.png')] opacity-5"></div>
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+        
+        <div className="max-w-2xl mx-auto relative">
+          <div className="text-center mb-10">
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl mb-4">
-              Book Your Appointment
+              <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">Book Your</span>
+              <span className="text-white"> Appointment</span>
             </h1>
-            <p className="text-lg text-muted-foreground">
-              Choose your services and provide your contact information.
+            <p className="text-lg text-gray-300">
+              Select your preferred services and schedule your visit with our expert barbers.
             </p>
           </div>
 
                 {/* Booking Response Modal */}
           {showModal && bookingResponse && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-              <Card className="w-full max-w-md">
-                <CardHeader>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4 backdrop-blur-sm">
+              <Card className="w-full max-w-md bg-gray-900 border border-amber-500/30 shadow-xl shadow-amber-500/10 text-white">
+                <CardHeader className="border-b border-gray-800">
                   <CardTitle className="flex items-center justify-between">
-                    <span>🎯 Booking Response</span>
+                    <span className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-amber-500 flex items-center justify-center">
+                        <span className="text-black text-xs font-bold">✓</span>
+                      </div>
+                      <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">Booking Response</span>
+                    </span>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowModal(false)}
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-800"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">{bookingResponse.message}</p>
+                <CardContent className="space-y-5 pt-5">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <p className="text-sm text-amber-300">{bookingResponse.message}</p>
                   </div>
 
                   {bookingResponse.appointment && (
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-lg">📅 Appointment Details</h3>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-lg flex items-center gap-2 text-amber-400">
+                        <span className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-xs">📅</span>
+                        Appointment Details
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4 text-sm bg-gray-800/50 p-4 rounded-lg border border-gray-700">
                         <div>
-                          <Label className="text-muted-foreground">Day</Label>
-                          <p className="font-medium">{bookingResponse.appointment.day}</p>
+                          <Label className="text-gray-400 mb-1 block">Day</Label>
+                          <p className="font-medium text-white">{bookingResponse.appointment.day}</p>
                         </div>
                         <div>
-                          <Label className="text-muted-foreground">Time Slot</Label>
-                          <p className="font-medium capitalize">{bookingResponse.appointment.timeSlot}</p>
+                          <Label className="text-gray-400 mb-1 block">Time Slot</Label>
+                          <p className="font-medium text-white capitalize">{bookingResponse.appointment.timeSlot}</p>
                         </div>
                         <div>
-                          <Label className="text-muted-foreground">Start Time</Label>
-                          <p className="font-medium">{new Date(bookingResponse.appointment.startTime).toLocaleTimeString()}</p>
+                          <Label className="text-gray-400 mb-1 block">Start Time</Label>
+                          <p className="font-medium text-white">{new Date(bookingResponse.appointment.startTime).toLocaleTimeString()}</p>
                         </div>
                         <div>
-                          <Label className="text-muted-foreground">End Time</Label>
-                          <p className="font-medium">{new Date(bookingResponse.appointment.endTime).toLocaleTimeString()}</p>
+                          <Label className="text-gray-400 mb-1 block">End Time</Label>
+                          <p className="font-medium text-white">{new Date(bookingResponse.appointment.endTime).toLocaleTimeString()}</p>
                         </div>
                       </div>
                     </div>
                   )}
 
                   {bookingResponse.links && (
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-lg">⚡ Quick Actions</h3>
-                      <div className="flex flex-col gap-2">
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-lg flex items-center gap-2 text-amber-400">
+                        <span className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-xs">⚡</span>
+                        Quick Actions
+                      </h3>
+                      <div className="flex flex-col gap-3">
                         <Button
                           onClick={handleAcceptAppointment}
                           disabled={isProcessingAction}
-                          className="w-full bg-green-600 hover:bg-green-700"
+                          className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-black font-medium hover:from-amber-600 hover:to-amber-700 shadow-lg shadow-amber-500/20"
                         >
                           {isProcessingAction ? (
                             <>
@@ -425,14 +449,14 @@ export default function Booking() {
                               Confirming...
                             </>
                           ) : (
-                            "✅ Accept & Confirm Booking"
+                            "Accept & Confirm Booking"
                           )}
                         </Button>
                         <Button
                           onClick={handleDeclineAppointment}
                           disabled={isProcessingAction}
                           variant="outline"
-                          className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                          className="w-full border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                         >
                           {isProcessingAction ? (
                             <>
@@ -440,17 +464,17 @@ export default function Booking() {
                               Processing...
                             </>
                           ) : (
-                            "❌ Decline Booking"
+                            "Decline Booking"
                           )}
                         </Button>
                       </div>
                     </div>
                   )}
 
-                  <div className="pt-2 border-t">
+                  <div className="pt-3 border-t border-gray-800">
                     <Button
-                      variant="secondary"
-                      className="w-full"
+                      variant="ghost"
+                      className="w-full text-gray-300 hover:text-white hover:bg-gray-800"
                       onClick={() => setShowModal(false)}
                     >
                       Close
@@ -461,59 +485,61 @@ export default function Booking() {
             </div>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Appointment Details</CardTitle>
+          <Card className="bg-gray-900 border border-amber-500/20 shadow-lg text-white">
+            <CardHeader className="border-b border-gray-800">
+              <CardTitle className="text-xl text-amber-400">Appointment Details</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
+            <CardContent className="pt-6">
+              <form onSubmit={handleSubmit} className="space-y-8">
                 {/* Customer Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name *</Label>
+                    <Label htmlFor="name" className="text-gray-300">Full Name *</Label>
                     <Input
                       id="name"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Enter your full name"
+                      className="bg-gray-800 border-gray-700 text-white focus:border-amber-500/50 focus:ring-amber-500/20"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Label htmlFor="phone" className="text-gray-300">Phone Number *</Label>
                     <Input
                       id="phone"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       placeholder="Enter your phone number"
+                      className="bg-gray-800 border-gray-700 text-white focus:border-amber-500/50 focus:ring-amber-500/20"
                     />
                   </div>
                 </div>
 
                 {/* Gender Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="gender">Gender *</Label>
+                  <Label htmlFor="gender" className="text-gray-300">Gender *</Label>
                   <Select value={selectedGender} onValueChange={handleGenderChange}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white focus:border-amber-500/50 focus:ring-amber-500/20">
                       <SelectValue placeholder="Select your gender" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gender">Gender</SelectItem>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                      <SelectItem value="gender" className="text-gray-400">Gender</SelectItem>
+                      <SelectItem value="male" className="text-white">Male</SelectItem>
+                      <SelectItem value="female" className="text-white">Female</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Day Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="day">Preferred Day *</Label>
+                  <Label htmlFor="day" className="text-gray-300">Preferred Day *</Label>
                   <Select value={selectedDay} onValueChange={handleDayChange}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white focus:border-amber-500/50 focus:ring-amber-500/20">
                       <SelectValue placeholder="Select your preferred day" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
                       {weekDays.map((day) => (
-                        <SelectItem key={day.value} value={day.value}>
+                        <SelectItem key={day.value} value={day.value} className="text-white">
                           {day.label}
                         </SelectItem>
                       ))}
@@ -523,14 +549,14 @@ export default function Booking() {
 
                 {/* Time Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="time">Preferred Time *</Label>
+                  <Label htmlFor="time" className="text-gray-300">Preferred Time *</Label>
                   <Select value={selectedTime} onValueChange={handleTimeChange}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white focus:border-amber-500/50 focus:ring-amber-500/20">
                       <SelectValue placeholder="Select your preferred time" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
                       {timeOptions.map((time) => (
-                        <SelectItem key={time.value} value={time.value}>
+                        <SelectItem key={time.value} value={time.value} className="text-white">
                           {time.label}
                         </SelectItem>
                       ))}
@@ -542,26 +568,26 @@ export default function Booking() {
 
                 {/* Service Selection */}
                 <div className="space-y-4">
-                  <Label>Select Services *</Label>
+                  <Label className="text-gray-300">Select Services *</Label>
                   {!isValidGender(selectedGender) ? (
-                    <div className="p-4 border rounded-lg bg-muted">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="p-5 border border-gray-700 rounded-lg bg-gray-800/50">
+                      <p className="text-sm text-gray-400">
                         Please select your gender first to view available services.
                       </p>
                     </div>
                   ) : isLoading ? (
-                    <div className="flex items-center gap-2 p-4 border rounded-lg">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading services for {selectedGender}...
+                    <div className="flex items-center gap-3 p-5 border border-gray-700 rounded-lg bg-gray-800/50">
+                      <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+                      <span className="text-gray-300">Loading services for {selectedGender}...</span>
                     </div>
                   ) : services.length === 0 ? (
-                    <div className="p-4 border rounded-lg bg-muted">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="p-5 border border-gray-700 rounded-lg bg-gray-800/50">
+                      <p className="text-sm text-gray-400">
                         No services available for {selectedGender}. Please try another gender.
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {serviceDropdowns.map((dropdown, index) => {
                         const availableServices = getAvailableServices(dropdown.id);
                         const selectedService = services.find(s => s._id === dropdown.value);
@@ -569,21 +595,21 @@ export default function Booking() {
                         return (
                           <div key={dropdown.id} className="flex items-center gap-3">
                             <div className="flex-1">
-                              <Select 
-                                value={dropdown.value} 
+                              <Select
+                                value={dropdown.value}
                                 onValueChange={(value) => handleServiceChange(dropdown.id, value)}
                               >
-                                <SelectTrigger>
+                                <SelectTrigger className="bg-gray-800 border-gray-700 text-white focus:border-amber-500/50 focus:ring-amber-500/20">
                                   <SelectValue placeholder={`Select service ${index + 1}`} />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="bg-gray-800 border-gray-700 text-white">
                                   {availableServices.length === 0 ? (
-                                    <SelectItem value="no-services" disabled>
+                                    <SelectItem value="no-services" disabled className="text-gray-500">
                                       No more services available for {selectedGender}
                                     </SelectItem>
                                   ) : (
                                     availableServices.map((service) => (
-                                      <SelectItem key={service._id} value={service._id}>
+                                      <SelectItem key={service._id} value={service._id} className="text-white">
                                         {service.name} - {service.cost} ({service.time})
                                       </SelectItem>
                                     ))
@@ -597,6 +623,7 @@ export default function Booking() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeService(selectedService._id)}
+                                className="text-gray-400 hover:text-white hover:bg-gray-800"
                               >
                                 <X className="h-4 w-4" />
                               </Button>
@@ -609,7 +636,7 @@ export default function Booking() {
                         type="button"
                         variant="outline"
                         onClick={addServiceDropdown}
-                        className="w-full"
+                        className="w-full border-gray-700 text-amber-400 hover:bg-gray-800 hover:text-amber-300 hover:border-amber-500/30"
                         disabled={serviceDropdowns.every(dropdown => dropdown.value === '')}
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -621,15 +648,15 @@ export default function Booking() {
 
                 {/* Selected Services Summary */}
                 {selectedServices.length > 0 && (
-                  <div className="space-y-3">
-                    <Label>Selected Services:</Label>
-                    <div className="space-y-2">
+                  <div className="space-y-4">
+                    <Label className="text-gray-300">Selected Services:</Label>
+                    <div className="space-y-3">
                       {selectedServices.map((selectedService) => (
-                        <div key={selectedService} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div key={selectedService} className="flex items-center justify-between p-4 bg-gray-800/70 border border-gray-700 hover:border-amber-500/30 rounded-lg transition-colors">
                           <div>
-                            <p className="font-medium">{services.find(s => s._id === selectedService)?.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {services.find(s => s._id === selectedService)?.cost} • {services.find(s => s._id === selectedService)?.time}
+                            <p className="font-medium text-white">{services.find(s => s._id === selectedService)?.name}</p>
+                            <p className="text-sm text-gray-400">
+                              <span className="text-amber-500">{services.find(s => s._id === selectedService)?.cost}</span> • {services.find(s => s._id === selectedService)?.time}
                             </p>
                           </div>
                           <Button
@@ -637,6 +664,7 @@ export default function Booking() {
                             variant="ghost"
                             size="sm"
                             onClick={() => removeService(selectedService)}
+                            className="text-gray-400 hover:text-white hover:bg-gray-800"
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -646,14 +674,19 @@ export default function Booking() {
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" size="lg" disabled={isBooking}>
+                <Button
+                  type="submit"
+                  className="w-full mt-8 bg-gradient-to-r from-amber-500 to-amber-600 text-black font-medium shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all hover:from-amber-600 hover:to-amber-700"
+                  size="lg"
+                  disabled={isBooking}
+                >
                   {isBooking ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Searching for slots...
                     </>
                   ) : (
-                    "📅 Book Appointment"
+                    "Book Your Appointment"
                   )}
                 </Button>
               </form>

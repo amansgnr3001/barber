@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, Scissors } from "lucide-react";
 
 const navButtons: { label: string; href: string; variant: "default" | "outline" }[] = [
-  { label: "Book Now", href: "/booking", variant: "default" },
+  { label: "Book Now", href: "/booking", variant: "outline" },
   { label: "Status", href: "/status", variant: "outline" },
   { label: "Services", href: "/services", variant: "outline" },
   { label: "About Us", href: "#about", variant: "outline" },
@@ -84,18 +84,23 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <nav className="container flex h-16 items-center justify-between" aria-label="Main Navigation">
-        <button 
+    <header className="sticky top-0 z-40 w-full border-b bg-gradient-to-r from-black via-gray-900 to-black text-white shadow-md">
+      <nav className="container flex h-20 items-center justify-between" aria-label="Main Navigation">
+        <button
           onClick={(e) => {
             e.preventDefault();
             navigate('/home');
           }}
-          className="font-semibold tracking-tight hover:opacity-80"
+          className="flex items-center gap-2 font-bold text-xl tracking-tight hover:opacity-80 transition-all duration-200"
         >
-          Barber Suite
+          <div className="h-10 w-10 rounded-full bg-amber-500 flex items-center justify-center">
+            <Scissors className="h-5 w-5 text-black transform -rotate-45" />
+          </div>
+          <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+            Barber Suite
+          </span>
         </button>
-        <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-3 overflow-x-auto">
           {navButtons.map((btn) => {
             const isActive = activePage === btn.label;
             return (
@@ -104,17 +109,21 @@ const Header: React.FC = () => {
                 size="sm"
                 variant={isActive ? "default" : btn.variant}
                 onClick={(e) => handleNavClick(e, btn.label, btn.href)}
-                className={isActive ? "bg-black text-white hover:bg-black/90" : ""}
+                className={
+                  isActive
+                    ? "bg-amber-500 text-black hover:bg-amber-600 font-medium"
+                    : "bg-transparent text-white border border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500 transition-all duration-200"
+                }
               >
                 {btn.label}
               </Button>
             );
           })}
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             variant="ghost"
             onClick={handleLogout}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
           >
             <LogOut className="h-4 w-4 mr-1" />
             Logout

@@ -172,14 +172,21 @@ export default function Status() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gradient-to-b from-black to-gray-900 text-white relative">
+        {/* Decorative elements */}
+        <div className="absolute inset-0 bg-[url('/images/barber-pattern.png')] opacity-5"></div>
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+        
         <SEO title="Appointment Status | Barber Suite" description="Check your appointment status" />
         <Header />
-        <main className="container py-16">
+        <main className="container py-16 relative z-10">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-              <p className="text-muted-foreground">Loading status...</p>
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 mx-auto mb-6">
+                <Loader2 className="h-8 w-8 animate-spin text-black" />
+              </div>
+              <p className="text-gray-300">Loading your appointment status...</p>
             </div>
           </div>
         </main>
@@ -188,17 +195,24 @@ export default function Status() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-black to-gray-900 text-white relative">
+      {/* Decorative elements */}
+      <div className="absolute inset-0 bg-[url('/images/barber-pattern.png')] opacity-5"></div>
+      <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+      
       <SEO title="Appointment Status | Barber Suite" description="Check your appointment status" />
       <Header />
-      <main className="container py-16">
+      <main className="container py-16 relative z-10">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
               <h1 className="text-4xl font-bold tracking-tight md:text-5xl mb-2">
-                📋 Appointment Status
+                <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+                  Appointment Status
+                </span>
               </h1>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-gray-300">
                 View your confirmed appointment details
               </p>
             </div>
@@ -206,6 +220,7 @@ export default function Status() {
               <Button
                 onClick={clearResponseData}
                 variant="outline"
+                className="text-gray-300 hover:text-white hover:bg-gray-800/50 border border-amber-500/30 hover:border-amber-500/50 transition-all"
               >
                 🗑️ Clear Data
               </Button>
@@ -213,14 +228,19 @@ export default function Status() {
           </div>
 
           {!responseData ? (
-            <Card>
+            <Card className="bg-gray-900 border border-amber-500/20 shadow-xl shadow-amber-500/10 text-white">
               <CardContent className="text-center py-16">
-                <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-xl font-semibold mb-2">No Appointment Details</h3>
-                <p className="text-muted-foreground mb-4">
+                <div className="h-20 w-20 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-6 border border-amber-500/20">
+                  <AlertCircle className="h-10 w-10 text-amber-500/80" />
+                </div>
+                <h3 className="text-2xl font-semibold mb-3 bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">No Appointment Details</h3>
+                <p className="text-gray-300 mb-6 max-w-md mx-auto">
                   No appointment found. Make a booking and accept it to see appointment details here.
                 </p>
-                <Button onClick={() => window.location.href = '/booking'}>
+                <Button
+                  onClick={() => window.location.href = '/booking'}
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 text-black shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all hover:from-amber-600 hover:to-amber-700"
+                >
                   📅 Go to Booking
                 </Button>
               </CardContent>
@@ -229,62 +249,78 @@ export default function Status() {
             <div className="space-y-6">
               {/* Appointment Details */}
               {responseData.response?.appointment && responseData.action === 'ACCEPT' && !responseData.error ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Appointment Details
+                <Card className="bg-gray-900 border border-amber-500/20 shadow-xl shadow-amber-500/10 text-white">
+                  <CardHeader className="border-b border-gray-800">
+                    <CardTitle className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                        <Calendar className="h-5 w-5 text-black" />
+                      </div>
+                      <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+                        Appointment Details
+                      </span>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-6">
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                       <div className="flex items-center gap-3">
-                        <User className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                          <User className="h-5 w-5 text-amber-500" />
+                        </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Customer Name</p>
-                          <p className="font-medium text-lg">{responseData.response.appointment.customerName}</p>
+                          <p className="text-sm text-gray-400">Customer Name</p>
+                          <p className="font-medium text-lg text-white">{responseData.response.appointment.customerName}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <Phone className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                          <Phone className="h-5 w-5 text-amber-500" />
+                        </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Phone Number</p>
-                          <p className="font-medium text-lg">{responseData.response.appointment.customerPhone || 'Not provided'}</p>
+                          <p className="text-sm text-gray-400">Phone Number</p>
+                          <p className="font-medium text-lg text-white">{responseData.response.appointment.customerPhone || 'Not provided'}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <User className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                          <User className="h-5 w-5 text-amber-500" />
+                        </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Gender</p>
-                          <p className="font-medium text-lg capitalize">{responseData.response.appointment.gender || 'Not specified'}</p>
+                          <p className="text-sm text-gray-400">Gender</p>
+                          <p className="font-medium text-lg capitalize text-white">{responseData.response.appointment.gender || 'Not specified'}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                       <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                          <Calendar className="h-5 w-5 text-amber-500" />
+                        </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Appointment Day</p>
-                          <p className="font-medium text-lg">{responseData.response.appointment.day}</p>
+                          <p className="text-sm text-gray-400">Appointment Day</p>
+                          <p className="font-medium text-lg text-white">{responseData.response.appointment.day}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <Clock className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                          <Clock className="h-5 w-5 text-amber-500" />
+                        </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Time Slot</p>
-                          <p className="font-medium text-lg capitalize">{responseData.response.appointment.timeSlot}</p>
+                          <p className="text-sm text-gray-400">Time Slot</p>
+                          <p className="font-medium text-lg capitalize text-white">{responseData.response.appointment.timeSlot}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <CheckCircle className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                          <CheckCircle className="h-5 w-5 text-amber-500" />
+                        </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Status</p>
-                          <Badge className="bg-green-100 text-green-800 text-sm px-3 py-1">
+                          <p className="text-sm text-gray-400">Status</p>
+                          <Badge className="bg-gradient-to-r from-amber-500 to-amber-600 text-black text-sm px-3 py-1 font-medium">
                             ✅ {responseData.response.appointment.status}
                           </Badge>
                         </div>
@@ -295,19 +331,23 @@ export default function Status() {
                       <div className="grid md:grid-cols-2 gap-6 mb-6">
                         {responseData.response.appointment.startTime && (
                           <div className="flex items-center gap-3">
-                            <Clock className="h-5 w-5 text-muted-foreground" />
+                            <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                              <Clock className="h-5 w-5 text-amber-500" />
+                            </div>
                             <div>
-                              <p className="text-sm text-muted-foreground">Start Time</p>
-                              <p className="font-medium text-lg">{formatDateTime(responseData.response.appointment.startTime)}</p>
+                              <p className="text-sm text-gray-400">Start Time</p>
+                              <p className="font-medium text-lg text-white">{formatDateTime(responseData.response.appointment.startTime)}</p>
                             </div>
                           </div>
                         )}
                         {responseData.response.appointment.endTime && (
                           <div className="flex items-center gap-3">
-                            <Clock className="h-5 w-5 text-muted-foreground" />
+                            <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center border border-amber-500/20">
+                              <Clock className="h-5 w-5 text-amber-500" />
+                            </div>
                             <div>
-                              <p className="text-sm text-muted-foreground">End Time</p>
-                              <p className="font-medium text-lg">{formatDateTime(responseData.response.appointment.endTime)}</p>
+                              <p className="text-sm text-gray-400">End Time</p>
+                              <p className="font-medium text-lg text-white">{formatDateTime(responseData.response.appointment.endTime)}</p>
                             </div>
                           </div>
                         )}
@@ -315,31 +355,30 @@ export default function Status() {
                     )}
 
                     {(responseData.response.appointment.id || responseData.response.appointment._id) && (
-                      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                      <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-amber-500/20">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-muted-foreground">Booking ID:</span>
-                          <span className="font-mono bg-white px-3 py-1 rounded border text-sm">
+                          <span className="text-sm font-medium text-amber-400">Booking ID:</span>
+                          <span className="font-mono bg-black/30 px-3 py-1 rounded border border-amber-500/30 text-sm text-amber-300">
                             {(responseData.response.appointment.id || responseData.response.appointment._id).toString().slice(-8)}
                           </span>
                         </div>
-                        <div className="mt-2 text-xs text-muted-foreground">
+                        <div className="mt-2 text-xs text-gray-400">
                           Full ID: {responseData.response.appointment.id || responseData.response.appointment._id}
                         </div>
                       </div>
                     )}
 
                     {/* Cancel Button */}
-                    <div className="pt-6 border-t">
+                    <div className="pt-6 border-t border-gray-800">
                       <Button
                         onClick={handleCancelAppointment}
                         disabled={isCancelling}
-                        variant="destructive"
                         size="lg"
-                        className="w-full md:w-auto"
+                        className="w-full md:w-auto bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 hover:shadow-red-500/40 transition-all"
                       >
                         {isCancelling ? (
                           <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                             Cancelling...
                           </>
                         ) : (
@@ -350,11 +389,13 @@ export default function Status() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card>
+                <Card className="bg-gray-900 border border-amber-500/20 shadow-xl shadow-amber-500/10 text-white">
                   <CardContent className="text-center py-16">
-                    <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-xl font-semibold mb-2">No Confirmed Appointment</h3>
-                    <p className="text-muted-foreground mb-4">
+                    <div className="h-20 w-20 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-6 border border-amber-500/20">
+                      <AlertCircle className="h-10 w-10 text-amber-500/80" />
+                    </div>
+                    <h3 className="text-2xl font-semibold mb-3 bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">No Confirmed Appointment</h3>
+                    <p className="text-gray-300 mb-6 max-w-md mx-auto">
                       {responseData.action === 'DECLINE'
                         ? 'You declined this appointment. The slot has been released.'
                         : responseData.error
@@ -362,7 +403,10 @@ export default function Status() {
                           : 'No confirmed appointment found.'
                       }
                     </p>
-                    <Button onClick={() => window.location.href = '/booking'}>
+                    <Button
+                      onClick={() => window.location.href = '/booking'}
+                      className="bg-gradient-to-r from-amber-500 to-amber-600 text-black shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all hover:from-amber-600 hover:to-amber-700"
+                    >
                       📅 Book New Appointment
                     </Button>
                   </CardContent>

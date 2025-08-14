@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Users, TrendingUp, Phone, User, Scissors, RefreshCw, Settings } from 'lucide-react';
+import { Calendar, Clock, Users, TrendingUp, Phone, User, Scissors, RefreshCw, Settings, LogOut, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Appointment {
@@ -86,7 +86,8 @@ const BarberDashboard: React.FC = () => {
         const response = await fetch('http://localhost:3001/api/appointments/all', {
           method: 'GET',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           }
         });
 
@@ -258,6 +259,81 @@ const BarberDashboard: React.FC = () => {
     });
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('barberData');
+
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out.",
+    });
+
+    navigate('/');
+  };
+
+  const handleCancelAppointment = async (appointmentId: string, customerName: string) => {
+    try {
+      const confirmCancel = confirm(`Are you sure you want to cancel the appointment for ${customerName}?`);
+      if (!confirmCancel) return;
+
+      const token = localStorage.getItem('token');
+      console.log('🔍 Cancelling appointment:', {
+        appointmentId,
+        customerName,
+        token: token ? 'Present' : 'Missing',
+        url: `http://localhost:3001/api/barber/cancel/${appointmentId}`
+      });
+
+      // Log current appointments to verify the ID exists
+      console.log('📋 Current appointments on dashboard:', appointments.all?.map(apt => ({
+        id: apt._id,
+        name: apt.customerName,
+        status: apt.status
+      })));
+
+      // Try the working cancel route first as fallback
+      const response = await fetch(`http://localhost:3001/api/cancel/${appointmentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 Cancel response:', response.status, response.ok);
+
+      let data;
+      try {
+        data = await response.json();
+        console.log('📡 Cancel data:', data);
+      } catch (jsonError) {
+        console.error('❌ Failed to parse JSON response:', jsonError);
+        throw new Error('Invalid response from server');
+      }
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Appointment cancelled successfully!",
+        });
+
+        // Refresh the dashboard data
+        await fetchDashboardData();
+      } else {
+        throw new Error(data.error || 'Failed to cancel appointment');
+      }
+
+    } catch (error) {
+      console.error('❌ Error cancelling appointment:', error);
+      toast({
+        title: "Error",
+        description: `Failed to cancel appointment: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatTime = (timeString: string) => {
     return new Date(timeString).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -403,6 +479,15 @@ const BarberDashboard: React.FC = () => {
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 {refreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
+              <Button
+                onClick={handleLogout}
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
             </div>
           </div>
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -545,6 +630,15 @@ const BarberDashboard: React.FC = () => {
                         <Badge variant="outline">
                           {appointment.gender}
                         </Badge>
+                        <Button
+                          onClick={() => handleCancelAppointment(appointment._id, appointment.customerName)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
+                          title="Cancel Appointment"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>
