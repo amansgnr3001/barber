@@ -391,11 +391,75 @@ Authorization: Bearer <token>
 }
 ```
 
-### Cancel Appointment
+### Delete Appointment (Admin/System Use)
+
+**Endpoint:** `DELETE /api/appointments/:id`
+
+**Description:** Permanently deletes an appointment from the system. This endpoint is primarily for administrative or system use.
+
+**Authentication:** Required (customer can only delete their own appointments, barbers can delete any)
+
+**URL Parameters:**
+- `id`: Appointment ID
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "✅ Appointment successfully deleted for John Doe on Monday morning. The time slot is now available for booking.",
+  "deletedAppointment": {
+    "id": "60d21b4667d0d8992e610c85",
+    "customerName": "John Doe",
+    "customerPhone": "1234567890",
+    "day": "Monday",
+    "timeSlot": "morning",
+    "gender": "male",
+    "deletedAt": "2023-01-01T00:00:00.000Z",
+    "deletedBy": "barber"
+  }
+}
+```
+
+### Delete All Matching Appointments
+
+**Endpoint:** `DELETE /api/appointments/delete-all/:id`
+
+**Description:** Deletes all appointments that match the specified ID. This endpoint is restricted to barbers only.
+
+**Authentication:** Required (barber role only)
+
+**URL Parameters:**
+- `id`: Appointment ID to match
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "✅ Successfully deleted 1 appointment(s) with ID: 60d21b4667d0d8992e610c85",
+  "deletedCount": 1,
+  "deletedAppointments": [
+    {
+      "id": "60d21b4667d0d8992e610c85",
+      "customerName": "John Doe",
+      "customerPhone": "1234567890",
+      "day": "Monday",
+      "timeSlot": "morning",
+      "gender": "male",
+      "startTime": "2023-01-01T09:00:00.000Z",
+      "endTime": "2023-01-01T10:00:00.000Z",
+      "services": ["60d21b4667d0d8992e610c85", "60d21b4667d0d8992e610c86"],
+      "deletedAt": "2023-01-01T00:00:00.000Z",
+      "deletedBy": "barber"
+    }
+  ]
+}
+```
+
+### Cancel Appointment (User Interface)
 
 **Endpoint:** `DELETE /api/appointments/:id/cancel`
 
-**Description:** Cancels an existing appointment.
+**Description:** Cancels an existing appointment. This is the preferred endpoint for user-initiated cancellations through the application interface.
 
 **Authentication:** Required (customer can only cancel their own appointments, barbers can cancel any)
 
@@ -406,7 +470,7 @@ Authorization: Bearer <token>
 ```json
 {
   "success": true,
-  "message": "✅ Appointment cancelled successfully for John Doe on Monday morning. The time slot is now available for booking.",
+  "message": "✅ Appointment successfully cancelled for John Doe on Monday morning. The time slot is now available for booking.",
   "cancelledAppointment": {
     "id": "60d21b4667d0d8992e610c85",
     "customerName": "John Doe",

@@ -3,9 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Users, TrendingUp, Phone, User, Scissors, RefreshCw, Settings, LogOut, X } from 'lucide-react';
+import { Calendar, Clock, Users, TrendingUp, Phone, User, Scissors, RefreshCw, Settings, LogOut, X, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { cancelAppointment } from '@/utils/appointmentTracker';
+import { cancelAppointment, deleteAllAppointments } from '@/utils/appointmentTracker';
 
 interface Appointment {
   _id: string;
@@ -317,6 +317,43 @@ const BarberDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteAllAppointments = async (appointmentId: string, customerName: string) => {
+    try {
+      const confirmDelete = confirm(`⚠️ WARNING: Are you sure you want to delete ALL appointments for ${customerName}? This action cannot be undone.`);
+      if (!confirmDelete) return;
+
+      console.log('🗑️ Deleting all appointments with ID:', {
+        appointmentId,
+        customerName
+      });
+
+      // Use the utility function to delete all appointments with this ID
+      const result = await deleteAllAppointments(appointmentId);
+      console.log('📡 Delete all result:', result);
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Successfully deleted ${result.deletedCount || 'all'} appointments for ${customerName}`,
+        });
+
+        // Refresh the dashboard data
+        await fetchDashboardData();
+      } else {
+        // Handle error from the utility function
+        throw new Error(result.error || result.response?.error || 'Failed to delete all appointments');
+      }
+
+    } catch (error) {
+      console.error('❌ Error deleting all appointments:', error);
+      toast({
+        title: "Error",
+        description: `Failed to delete all appointments: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatTime = (timeString: string) => {
     return new Date(timeString).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -613,15 +650,26 @@ const BarberDashboard: React.FC = () => {
                         <Badge variant="outline">
                           {appointment.gender}
                         </Badge>
-                        <Button
-                          onClick={() => handleCancelAppointment(appointment._id, appointment.customerName)}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
-                          title="Cancel Appointment"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        <div className="flex space-x-1">
+                          <Button
+                            onClick={() => handleCancelAppointment(appointment._id, appointment.customerName)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
+                            title="Cancel Appointment"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            onClick={() => handleDeleteAllAppointments(appointment._id, appointment.customerName)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-800 hover:text-red-900 hover:bg-red-50 p-1"
+                            title="Delete All Appointments with this ID"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>

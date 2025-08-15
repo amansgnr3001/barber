@@ -137,128 +137,7 @@ const authenticateBarber = (req, res, next) => {
   }
 };
 
-// Consolidated cancel appointment route
-console.log('✅ Registering consolidated cancel route: DELETE /api/appointments/:id/cancel');
-app.delete('/api/appointments/:id/cancel', authenticateToken, async (req, res) => {
-  console.log(`\n🎯 ===== CANCEL APPOINTMENT ROUTE HIT =====`);
-  console.log(`🗑️ DELETE /api/appointments/:id/cancel route accessed`);
-  console.log(`📅 Timestamp: ${new Date().toLocaleString()}`);
-  console.log(`🆔 Request IP: ${req.ip || 'unknown'}`);
-  console.log(`🔑 Authorization header: ${req.headers.authorization ? 'Present' : 'Missing'}`);
-  console.log(`👤 User: ${req.user?.email || req.user?.id || 'Unknown'}`);
-
-  try {
-    const appointmentId = req.params.id;
-    console.log(`🗑️ Cancel request received for appointment: ${appointmentId}`);
-
-    // Validate appointment ID format
-    if (!appointmentId || appointmentId.length < 12) {
-      console.log(`❌ Invalid appointment ID format: ${appointmentId}`);
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid appointment ID format'
-      });
-    }
-
-    // Find the appointment
-    const appointment = await Appointment.findById(appointmentId);
-
-    if (!appointment) {
-      console.log(`❌ Appointment not found in database: ${appointmentId}`);
-      return res.status(404).json({
-        success: false,
-        error: 'Appointment not found. It may have already been cancelled.'
-      });
-    }
-
-    console.log(`📋 Found appointment: ${appointment.customerName} on ${appointment.day} ${appointment.timeSlot}`);
-
-    // Check if user is authorized to cancel this appointment
-    // Barbers can cancel any appointment, customers can only cancel their own
-    const isBarber = req.user?.role === 'barber';
-    const isOwner = req.user?.id === appointment.customerId?.toString() ||
-                    req.user?.email === appointment.customerEmail;
-    
-    if (!isBarber && !isOwner) {
-      console.log(`❌ Unauthorized cancellation attempt by user: ${req.user?.email || req.user?.id}`);
-      return res.status(403).json({
-        success: false,
-        error: 'You are not authorized to cancel this appointment'
-      });
-    }
-
-    // Determine which slots collection to update based on gender
-    const SlotsSchema = slotUtils.getSlotsModel(appointment.gender);
-    console.log(`📊 Using slots collection for gender: ${appointment.gender}`);
-
-    // Update appointment status instead of deleting it (to maintain history)
-    const cancelledAppointment = await Appointment.findByIdAndUpdate(
-      appointmentId,
-      {
-        status: 'cancelled',
-        cancelledAt: new Date(),
-        cancelledBy: isBarber ? 'barber' : 'customer'
-      },
-      { new: true }
-    );
-
-    if (!cancelledAppointment) {
-      console.log(`❌ Failed to update appointment status: ${appointmentId}`);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to cancel appointment'
-      });
-    }
-
-    console.log(`✅ Appointment status updated to cancelled: ${appointmentId}`);
-
-    // Update the corresponding slot to make it available again
-    try {
-      const slotUpdate = await SlotsSchema.updateOne(
-        { day: appointment.day },
-        { $set: { [`${appointment.timeSlot}.available`]: true } }
-      );
-
-      console.log(`✅ Slot update successful:`, slotUpdate);
-
-      if (slotUpdate.matchedCount === 0) {
-        console.log(`⚠️ Warning: No slot document found for day ${appointment.day}`);
-      }
-
-    } catch (slotError) {
-      console.error(`❌ Error updating slot availability:`, slotError);
-      // Continue anyway since appointment status is already updated
-    }
-
-    // Prepare success response
-    const responseData = {
-      success: true,
-      message: `✅ Appointment cancelled successfully for ${appointment.customerName} on ${appointment.day} ${appointment.timeSlot}. The time slot is now available for booking.`,
-      cancelledAppointment: {
-        id: cancelledAppointment._id.toString(),
-        customerName: cancelledAppointment.customerName,
-        customerPhone: cancelledAppointment.customerPhone,
-        day: cancelledAppointment.day,
-        timeSlot: cancelledAppointment.timeSlot,
-        gender: cancelledAppointment.gender,
-        status: cancelledAppointment.status,
-        cancelledAt: cancelledAppointment.cancelledAt,
-        cancelledBy: cancelledAppointment.cancelledBy
-      }
-    };
-
-    console.log(`🎉 Cancel operation completed successfully for: ${appointmentId}`);
-    res.json(responseData);
-
-  } catch (error) {
-    console.error('❌ Unexpected error in cancel appointment:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error while cancelling appointment',
-      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later'
-    });
-  }
-});
+ 
 
 // Customer Login Route
 console.log('✅ Registering customer login route: POST /api/login');
@@ -338,6 +217,135 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'An error occurred during login'
+    });
+  }
+});
+
+ 
+
+// Utility function to update slot availability
+const updateSlotAvailability = async (appointment) => {
+  try {
+    const SlotsSchema = slotUtils.getSlotsModel(appointment.gender);
+    const slotUpdate = await SlotsSchema.updateOne(
+      { day: appointment.day },
+      { $set: { [`${appointment.timeSlot}.available`]: true } }
+    );
+    
+    console.log(`✅ Slot update successful for appointment ${appointment._id}:`, slotUpdate);
+    
+    if (slotUpdate.matchedCount === 0) {
+      console.log(`⚠️ Warning: No slot document found for day ${appointment.day}`);
+    }
+    
+    return { success: true, slotUpdate };
+  } catch (slotError) {
+    console.error(`❌ Error updating slot availability for appointment ${appointment._id}:`, slotError);
+    return { success: false, error: slotError };
+  }
+};
+
+ 
+
+// DELETE APPOINTMENT ROUTE - Legacy route, prefer using cancel route
+console.log('✅ Registering delete appointment route: DELETE /api/appointments/:id');
+app.delete('/api/appointments/:id', authenticateToken, async (req, res) => {
+  console.log(`\n🎯 ===== DELETE APPOINTMENT ROUTE HIT =====`);
+  console.log(`🗑️ DELETE /api/appointments/:id route accessed`);
+  console.log(`📅 Timestamp: ${new Date().toLocaleString()}`);
+  console.log(`🆔 Request IP: ${req.ip || 'unknown'}`);
+  console.log(`🔑 Authorization header: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+  console.log(`👤 User: ${req.user?.email || req.user?.id || 'Unknown'}`);
+  console.log(`🎭 User Role: ${req.user?.role || 'customer'}`);
+
+  try {
+    const appointmentId = req.params.id;
+    console.log(`🗑️ Delete request received for appointment: ${appointmentId}`);
+
+    // Validate appointment ID format
+    if (!appointmentId || appointmentId.length < 12) {
+      console.log(`❌ Invalid appointment ID format: ${appointmentId}`);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid appointment ID format'
+      });
+    }
+
+    // Find the appointment
+    const appointment = await Appointment.findById(appointmentId);
+
+    if (!appointment) {
+      console.log(`❌ Appointment not found in database: ${appointmentId}`);
+      return res.status(404).json({
+        success: false,
+        error: 'Appointment not found. It may have already been deleted.'
+      });
+    }
+
+    console.log(`📋 Found appointment: ${appointment.customerName} on ${appointment.day} ${appointment.timeSlot}`);
+
+    // Check authorization based on user role
+    const isBarber = req.user?.role === 'barber';
+    const isOwner = req.user?.id === appointment.customerId?.toString() ||
+                    req.user?.email === appointment.customerEmail;
+    
+    if (!isBarber && !isOwner) {
+      console.log(`❌ Unauthorized deletion attempt by user: ${req.user?.email || req.user?.id}`);
+      return res.status(403).json({
+        success: false,
+        error: 'You are not authorized to delete this appointment'
+      });
+    }
+
+    console.log(`✅ Authorization check passed - User can delete this appointment`);
+
+    // Store appointment details before deletion
+    const deletedAppointmentInfo = {
+      id: appointment._id.toString(),
+      customerName: appointment.customerName,
+      customerPhone: appointment.customerPhone,
+      day: appointment.day,
+      timeSlot: appointment.timeSlot,
+      gender: appointment.gender,
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      services: appointment.services,
+      deletedAt: new Date(),
+      deletedBy: isBarber ? 'barber' : 'customer'
+    };
+
+    // Delete the appointment from database
+    const deletionResult = await Appointment.findByIdAndDelete(appointmentId);
+
+    if (!deletionResult) {
+      console.log(`❌ Failed to delete appointment: ${appointmentId}`);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete appointment from database'
+      });
+    }
+
+    console.log(`✅ Appointment successfully deleted from database: ${appointmentId}`);
+
+    // Update the corresponding slot to make it available again
+    await updateSlotAvailability(appointment);
+
+    // Prepare success response
+    const responseData = {
+      success: true,
+      message: `✅ Appointment successfully deleted for ${deletedAppointmentInfo.customerName} on ${deletedAppointmentInfo.day} ${deletedAppointmentInfo.timeSlot}. The time slot is now available for booking.`,
+      deletedAppointment: deletedAppointmentInfo
+    };
+
+    console.log(`🎉 Delete operation completed successfully for: ${appointmentId}`);
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('❌ Unexpected error in cancel appointment:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error while cancelling appointment',
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later'
     });
   }
 });
@@ -579,13 +587,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Legacy cancel route - redirect to the consolidated route
-console.log('✅ Registering legacy cancel route redirect: DELETE /api/cancel/:id');
-app.delete('/api/cancel/:id', authenticateToken, (req, res, next) => {
-  console.log(`\n🔄 Redirecting from legacy cancel route to consolidated route`);
-  req.url = `/api/appointments/${req.params.id}/cancel`;
-  next();
-});
+ 
 
 // Get all appointments for barber dashboard (barber authentication required)
 console.log('✅ Registering appointments endpoint: GET /api/appointments/all');
@@ -979,13 +981,7 @@ app.delete('/api/services/:id', authenticateBarber, async (req, res) => {
   }
 });
 
-// Legacy barber cancel route - redirect to the consolidated route with barber authentication
-console.log('✅ Registering legacy barber cancel route: DELETE /api/barber/cancel/:id');
-app.delete('/api/barber/cancel/:id', authenticateBarber, (req, res, next) => {
-  console.log(`\n🔄 Redirecting from legacy barber cancel route to consolidated route`);
-  req.url = `/api/appointments/${req.params.id}/cancel`;
-  next();
-});
+ 
 
 // Get customer profile
 console.log('✅ Registering customer profile route: GET /api/customer/profile');
@@ -1334,11 +1330,7 @@ app.get('/api/appointments/accept', authenticateToken, async (req, res) => {
 
 // Legacy cancel appointment route - redirect to the consolidated route
 console.log('✅ Registering legacy cancel appointment route: DELETE /api/appointments/cancel/:id');
-app.delete('/api/appointments/cancel/:id', authenticateToken, (req, res, next) => {
-  console.log(`\n🔄 Redirecting from legacy appointments cancel route to consolidated route`);
-  req.url = `/api/appointments/${req.params.id}/cancel`;
-  next();
-});
+ 
 
 // Decline appointment link -> no-op confirmation (authentication required)
 app.get('/api/appointments/decline', authenticateToken, (req, res) => {

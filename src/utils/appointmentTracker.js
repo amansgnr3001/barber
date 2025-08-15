@@ -1,21 +1,76 @@
-/**
- * Utility functions for handling appointment tracking, actions, and service management
- */
+export const acceptAppointment = async (url, originalBooking) => {
+  return processAppointmentAction(url, 'ACCEPT', originalBooking);
+};
 
-/**
- * Makes an authenticated request to an appointment action URL (accept/decline)
- * @param {string} url - The appointment action URL
- * @param {string} action - The action being performed ('ACCEPT' or 'DECLINE')
- * @param {Object} originalBooking - The original booking response data
- * @returns {Promise<Object>} - The response data and metadata
- */
-export const processAppointmentAction = async (url, action, originalBooking) => {
+export const declineAppointment = async (url, originalBooking) => {
+  return processAppointmentAction(url, 'DECLINE', originalBooking);
+};
+
+export const cancelAppointment = async (appointmentId) => {
   try {
-    // Get the appropriate token based on user type
     const customerToken = localStorage.getItem('token');
     const barberToken = localStorage.getItem('barberToken');
     const token = customerToken || barberToken;
-    
+
+    if (!token) {
+      console.error('No authentication token found');
+      return {
+        success: false,
+        error: 'Authentication token not found. Please log in again.',
+        action: 'CANCEL',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    console.log(`🔍 Cancelling appointment with ID ${appointmentId}`);
+    console.log(`🔑 Using ${customerToken ? 'customer' : 'barber'} token:`, token.substring(0, 15) + '...');
+
+    const response = await fetch(`http://localhost:3001/api/appointments/${appointmentId}/cancel`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('Failed to parse JSON response:', jsonError);
+      return { success: false, error: 'Invalid response format from server', httpStatus: response.status, action: 'CANCEL', timestamp: new Date().toISOString() };
+    }
+
+    const responseData = {
+      action: 'CANCEL',
+      timestamp: new Date().toISOString(),
+      response: data,
+      httpStatus: response.status,
+      success: response.ok && data.success
+    };
+    localStorage.setItem('lastCancelResponse', JSON.stringify(responseData));
+    return responseData;
+
+  } catch (error) {
+    console.error(`Error cancelling appointment:`, error);
+    const errorData = {
+      action: 'CANCEL',
+      timestamp: new Date().toISOString(),
+      error: true,
+      success: false,
+      response: { success: false, error: error.message || 'Failed to cancel appointment' }
+    };
+    localStorage.setItem('lastCancelResponse', JSON.stringify(errorData));
+    return errorData;
+  }
+};
+
+export const processAppointmentAction = async (url, action, originalBooking) => {
+  try {
+    const customerToken = localStorage.getItem('token');
+    const barberToken = localStorage.getItem('barberToken');
+    const token = customerToken || barberToken;
+
     if (!token) {
       console.error('No authentication token found');
       return {
@@ -26,27 +81,20 @@ export const processAppointmentAction = async (url, action, originalBooking) => 
         originalBooking
       };
     }
-    
+
     console.log(`🔍 Processing ${action} appointment with ${customerToken ? 'customer' : 'barber'} token:`, token.substring(0, 15) + '...');
-    
-    // Extract the base URL and query parameters
+
     const urlObj = new URL(url);
     const queryParams = urlObj.search;
-    
-    // Reconstruct the URL without the query parameters
     const baseUrl = urlObj.origin + urlObj.pathname;
-    
-    // Make the authenticated request
+
     const response = await fetch(`${baseUrl}${queryParams}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: { 'Authorization': `Bearer ${token}` }
     });
-    
+
     const data = await response.json();
-    
-    // Create response data object
+
     const responseData = {
       action,
       timestamp: new Date().toISOString(),
@@ -55,75 +103,44 @@ export const processAppointmentAction = async (url, action, originalBooking) => 
       httpStatus: response.status,
       success: data.success
     };
-    
-    // Store in localStorage for Status page
+
     localStorage.setItem('lastAppointmentResponse', JSON.stringify(responseData));
-    
     return responseData;
+
   } catch (error) {
     console.error(`Error processing ${action} appointment:`, error);
-    
-    // Create error response
     const errorData = {
       action,
       timestamp: new Date().toISOString(),
       error: true,
       success: false,
-      response: {
-        success: false,
-        error: error.message || `Failed to process appointment ${action.toLowerCase()}`
-      },
+      response: { success: false, error: error.message || `Failed to process appointment ${action.toLowerCase()}` },
       originalBooking
     };
-    
-    // Store error in localStorage
     localStorage.setItem('lastAppointmentResponse', JSON.stringify(errorData));
-    
     return errorData;
   }
 };
 
-/**
- * Accept an appointment with proper authentication
- * @param {string} acceptUrl - The accept URL from booking response
- * @param {Object} originalBooking - The original booking response data
- * @returns {Promise<Object>} - The response data
- */
-export const acceptAppointment = async (acceptUrl, originalBooking) => {
-  return processAppointmentAction(acceptUrl, 'ACCEPT', originalBooking);
-};
-
-/**
- * Decline an appointment with proper authentication
- * @param {string} declineUrl - The decline URL from booking response
- * @param {Object} originalBooking - The original booking response data
- * @returns {Promise<Object>} - The response data
- */
-export const declineAppointment = async (declineUrl, originalBooking) => {
-  return processAppointmentAction(declineUrl, 'DECLINE', originalBooking);
-};
-
-/**
- * Fetch services with proper authentication for barber dashboard
- * @returns {Promise<Object>} - The response data with services
- */
+// Fetch services with authentication
 export const fetchAuthenticatedServices = async () => {
   try {
-    // Get the barber token for authentication
-    const token = localStorage.getItem('barberToken');
-    
+    const customerToken = localStorage.getItem('token');
+    const barberToken = localStorage.getItem('barberToken');
+    const token = customerToken || barberToken;
+
     if (!token) {
-      console.error('No barber authentication token found');
+      console.error('No authentication token found');
       return {
         success: false,
         error: 'Authentication token not found. Please log in again.',
-        services: []
+        action: 'FETCH_SERVICES',
+        timestamp: new Date().toISOString()
       };
     }
-    
-    console.log('🔍 Fetching services with barber authentication');
-    
-    // Make the authenticated request to the services endpoint
+
+    console.log(`🔍 Fetching services with ${customerToken ? 'customer' : 'barber'} token`);
+
     const response = await fetch('http://localhost:3001/api/services', {
       method: 'GET',
       headers: {
@@ -131,114 +148,93 @@ export const fetchAuthenticatedServices = async () => {
         'Content-Type': 'application/json'
       }
     });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Failed to fetch services:', response.status, errorText);
-      return {
-        success: false,
-        error: `Failed to fetch services: ${response.status} - ${errorText || 'Unknown error'}`,
-        services: []
-      };
-    }
-    
-    const data = await response.json();
-    return {
-      success: true,
-      services: data
-    };
-  } catch (error) {
-    console.error('Error fetching services:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to fetch services',
-      services: []
-    };
-  }
-};
 
-/**
- * Cancel an appointment with proper authentication
- * @param {string} appointmentId - The ID of the appointment to cancel
- * @returns {Promise<Object>} - The response data
- */
-export const cancelAppointment = async (appointmentId) => {
-  try {
-    // Try to get either customer or barber token for authentication
-    const customerToken = localStorage.getItem('token');
-    const barberToken = localStorage.getItem('barberToken');
-    const token = customerToken || barberToken;
-    
-    if (!token) {
-      console.error('No authentication token found');
-      return {
-        success: false,
-        error: 'Authentication token not found. Please log in again.',
-        action: 'CANCEL',
-        timestamp: new Date().toISOString()
-      };
-    }
-    
-    console.log(`🔍 Using ${customerToken ? 'customer' : 'barber'} token for cancellation`);
-    
-    console.log(`🔍 Cancelling appointment ${appointmentId} with token:`, token.substring(0, 15) + '...');
-    
-    // Make the authenticated request to the cancel endpoint
-    const response = await fetch(`http://localhost:3001/api/appointments/${appointmentId}/cancel`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    // Try to parse the response as JSON
     let data;
     try {
       data = await response.json();
     } catch (jsonError) {
       console.error('Failed to parse JSON response:', jsonError);
-      // Return a structured error response instead of throwing
+      return { 
+        success: false, 
+        error: 'Invalid response format from server', 
+        action: 'FETCH_SERVICES', 
+        timestamp: new Date().toISOString() 
+      };
+    }
+
+    if (!response.ok) {
       return {
         success: false,
-        error: 'Invalid response format from server',
-        httpStatus: response.status,
-        action: 'CANCEL',
+        error: data.error || 'Failed to fetch services',
+        action: 'FETCH_SERVICES',
         timestamp: new Date().toISOString()
       };
     }
-    
-    // Create response data object
+
+    return {
+      success: true,
+      services: data,
+      action: 'FETCH_SERVICES',
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error(`Error fetching services:`, error);
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch services',
+      action: 'FETCH_SERVICES',
+      timestamp: new Date().toISOString()
+    };
+  }
+};
+
+// Now define deleteAllAppointments after the above function
+export const deleteAllAppointments = async (appointmentId) => {
+  try {
+    const barberToken = localStorage.getItem('barberToken');
+    if (!barberToken) {
+      console.error('No barber authentication token found');
+      return { success: false, error: 'Barber authentication token not found. Please log in again.', action: 'DELETE_ALL', timestamp: new Date().toISOString() };
+    }
+    console.log(`🔍 Deleting all appointments with ID ${appointmentId}`);
+    const response = await fetch(`http://localhost:3001/api/appointments/delete-all/${appointmentId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${barberToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('Failed to parse JSON response:', jsonError);
+      return { success: false, error: 'Invalid response format from server', httpStatus: response.status, action: 'DELETE_ALL', timestamp: new Date().toISOString() };
+    }
+
     const responseData = {
-      action: 'CANCEL',
+      action: 'DELETE_ALL',
       timestamp: new Date().toISOString(),
       response: data,
       httpStatus: response.status,
-      success: response.ok && data.success
+      success: response.ok && data.success,
+      deletedCount: data.deletedCount || 0
     };
-    
-    // Store in localStorage for reference
-    localStorage.setItem('lastCancelResponse', JSON.stringify(responseData));
-    
+    localStorage.setItem('lastDeleteAllResponse', JSON.stringify(responseData));
     return responseData;
+
   } catch (error) {
-    console.error(`Error cancelling appointment:`, error);
-    
-    // Create error response
+    console.error(`Error deleting all appointments:`, error);
     const errorData = {
-      action: 'CANCEL',
+      action: 'DELETE_ALL',
       timestamp: new Date().toISOString(),
       error: true,
       success: false,
-      response: {
-        success: false,
-        error: error.message || 'Failed to cancel appointment'
-      }
+      response: { success: false, error: error.message || 'Failed to delete all appointments' }
     };
-    
-    // Store error in localStorage
-    localStorage.setItem('lastCancelResponse', JSON.stringify(errorData));
-    
+    localStorage.setItem('lastDeleteAllResponse', JSON.stringify(errorData));
     return errorData;
   }
 };
